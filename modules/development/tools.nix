@@ -10,7 +10,9 @@
     jaq
     nix-index
     devenv
-    gcc
+    rustc
+    clang
+    mold
     just
     pkg-config
     nil
