@@ -1,0 +1,2 @@
+# nixos_configuration
+個人的NixOS用の設定リポジトリ
