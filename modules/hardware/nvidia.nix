@@ -12,7 +12,9 @@
     powerManagement.finegrained = false;
     open = false;
     nvidiaSettings = true;
-    package = config.boot.kernelPackages.nvidiaPackages.stable;
+    # Prefer long-lived branch for older GPUs like GTX 1080.
+    package = config.boot.kernelPackages.nvidiaPackages.production
+      or config.boot.kernelPackages.nvidiaPackages.stable;
   };
 
   environment.sessionVariables = {
