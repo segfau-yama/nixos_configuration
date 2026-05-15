@@ -2,7 +2,7 @@
 {
   services.xserver.videoDrivers = [ "amdgpu" ];
 
-  # RADV is default on AMD and works well for gaming on Wayland.
+  # RADV は AMD で標準となり、Wayland のゲーム用途でも安定しやすい。
   environment.systemPackages = with pkgs; [
     mesa
   ];

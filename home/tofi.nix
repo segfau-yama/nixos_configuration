@@ -3,34 +3,34 @@
   programs.tofi = {
     enable = true;
     settings = {
-      # Window sizing and positioning
+      # ウィンドウサイズと配置
       width = "44%";
       height = 300;
       anchor = "center";
 
-      # Borders and corners
+      # 枠線と角丸
       corner-radius = 14;
       border-width = 1;
       outline-width = 0;
       padding-x = 0;
       padding-y = 0;
 
-      # Colors - Catppuccin theme
+      # 色設定 - Catppuccin テーマ
       background-color = "#11111bcc";
       text-color = "#cdd6f4";
       input-color = "#cdd6f4";
       selection-color = "#cba6f7";
       selection-background-color = "#cba6f73d";
 
-      # Borders
+      # 枠線
       border-color = "#cba6f74d";
       outline-color = "#cba6f74d";
 
-      # Font
+      # フォント
       font = "Inter";
       font-size = 12;
 
-      # UI behavior
+      # UI の挙動
       result-format = "{name}";
       prompt-text = "apps ";
       prompt-color = "#cba6f7";
@@ -38,64 +38,64 @@
       prompt-padding = 10;
       prompt-font-size = 12;
 
-      # Input area styling
+      # 入力欄のスタイル
       input-background-color = "#1e1e2ecc";
       input-background-padding = 10;
       input-padding = 0;
 
-      # List styling
+      # リストのスタイル
       list-items-per-column = 9;
       list-max-display-height = 300;
 
-      # Horizontal layout (stacked vertically)
+      # 水平方向レイアウト（縦積みを無効化）
       horizontal = false;
 
-      # Matching
+      # マッチング
       fuzzy-match = true;
       require-match = false;
 
-      # Sorting
+      # ソート
       sort = true;
       sort-by = "frecency";
 
-      # History
+      # 履歴
       history-file = "~/.cache/tofi/history";
     };
   };
 
-  # Alternative: Using xdg.configFile for more advanced customization
+  # 代替案: より詳細なカスタマイズ向けに xdg.configFile を使用
   xdg.configFile."tofi/config".text = ''
-    # Tofi Configuration (Catppuccin theme)
+    # Tofi 設定（Catppuccin テーマ）
     width = 44%
     height = 300
     anchor = center
     
-    # Borders and styling
+    # 枠線とスタイル
     corner-radius = 14
     border-width = 1
     border-color = #cba6f74d
     padding-x = 0
     padding-y = 0
     
-    # Colors - Catppuccin
+    # 色設定 - Catppuccin
     background-color = #11111bcc
     text-color = #cdd6f4
     input-color = #cdd6f4
     selection-color = #cba6f7
     selection-background-color = #cba6f73d
     
-    # Prompt styling
+    # プロンプトのスタイル
     prompt-text = "apps "
     prompt-color = #cba6f7
     prompt-background-color = #1e1e2ecc
     prompt-padding = 10
     prompt-font-size = 12
     
-    # Input area
+    # 入力欄
     input-background-color = #1e1e2ecc
     input-padding = 10
     
-    # List
+    # リスト
     list-items-per-column = 9
     list-max-display-height = 300
     
@@ -106,11 +106,11 @@
     sort = true
     sort-by = frecency
     
-    # Font
+    # フォント
     font = Inter
     font-size = 12
     
-    # History
+    # 履歴
     history-file = ~/.cache/tofi/history
   '';
 }

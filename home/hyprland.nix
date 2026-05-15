@@ -7,6 +7,7 @@
       "$terminal" = "foot";
       "$fileManager" = "thunar";
       "$menu" = "tofi";
+      "$browser" = "chromium";
 
       monitor = [ ",preferred,auto,1.0" ];
       exec-once = [
@@ -128,10 +129,10 @@
         "$mainMod, E, exec, $fileManager"
         "$mainMod, V, togglefloating"
         "$mainMod, F, fullscreen"
-        "$mainMod, R, exec, $menu"
+        "$mainMod, W, exec, $browser"
+        "$mainMod, D, exec, $menu"
         "$mainMod, P, pseudo"
         "$mainMod, J, layoutmsg, togglesplit"
-        "$mainMod, D, exec, tofi"
         "SUPER SHIFT, right, movetoworkspace, +1"
         "SUPER SHIFT, left, movetoworkspace, -1"
         ", Print, exec, hyprshot -m region"

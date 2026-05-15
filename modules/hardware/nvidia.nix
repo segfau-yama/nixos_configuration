@@ -12,7 +12,7 @@
     powerManagement.finegrained = false;
     open = false;
     nvidiaSettings = true;
-    # Prefer long-lived branch for older GPUs like GTX 1080.
+    # GTX 1080 のような旧世代 GPU では長期サポート系ブランチを優先。
     package = config.boot.kernelPackages.nvidiaPackages.production
       or config.boot.kernelPackages.nvidiaPackages.stable;
   };

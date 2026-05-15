@@ -2,6 +2,8 @@
 {
   imports = [
     ./packages.nix
+    ./browser.nix
+    ./sns.nix
     ./services.nix
     ./hyprland.nix
     ./tofi.nix
@@ -14,7 +16,7 @@
 
   programs.home-manager.enable = true;
 
-  # Wayland session variables for Electron/Chromium apps.
+  # Electron/Chromium 系アプリ向けの Wayland セッション変数。
   home.sessionVariables = {
     NIXOS_OZONE_WL = "1";
     MOZ_ENABLE_WAYLAND = "1";

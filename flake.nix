@@ -28,7 +28,7 @@
           ./hosts/default.nix
           home-manager.nixosModules.home-manager
           {
-            # Home Manager integrated into declarative NixOS rebuild flow.
+            # Home Manager を宣言的な NixOS 再構築フローに統合。
             home-manager.useGlobalPkgs = true;
             home-manager.useUserPackages = true;
             home-manager.extraSpecialArgs = {
@@ -48,7 +48,7 @@
           ./hosts/nvidia.nix
           home-manager.nixosModules.home-manager
           {
-            # Home Manager integrated into declarative NixOS rebuild flow.
+            # Home Manager を宣言的な NixOS 再構築フローに統合。
             home-manager.useGlobalPkgs = true;
             home-manager.useUserPackages = true;
             home-manager.extraSpecialArgs = {
@@ -68,7 +68,51 @@
           ./hosts/amd.nix
           home-manager.nixosModules.home-manager
           {
-            # Home Manager integrated into declarative NixOS rebuild flow.
+            # Home Manager を宣言的な NixOS 再構築フローに統合。
+            home-manager.useGlobalPkgs = true;
+            home-manager.useUserPackages = true;
+            home-manager.extraSpecialArgs = {
+              inherit unstablePkgs;
+            };
+            home-manager.users.yama = import ./home/home.nix;
+          }
+        ];
+      };
+
+      # /nix ストアを HDD に配置するプロファイル。
+      # 使用方法: sudo nixos-rebuild switch --flake .#with-hdd
+      # 事前に hdd.nix の UUID を実際の HDD UUID に書き換えること。
+      nixosConfigurations.with-hdd = nixpkgs.lib.nixosSystem {
+        inherit system;
+        specialArgs = {
+          inherit inputs unstablePkgs;
+        };
+        modules = [
+          ./hosts/default.nix
+          ./modules/hardware/hdd.nix
+          home-manager.nixosModules.home-manager
+          {
+            home-manager.useGlobalPkgs = true;
+            home-manager.useUserPackages = true;
+            home-manager.extraSpecialArgs = {
+              inherit unstablePkgs;
+            };
+            home-manager.users.yama = import ./home/home.nix;
+          }
+        ];
+      };
+
+      # HDD 未接続時のフォールバックプロファイル（デフォルトと同等）。
+      # 使用方法: sudo nixos-rebuild switch --flake .#without-hdd
+      nixosConfigurations.without-hdd = nixpkgs.lib.nixosSystem {
+        inherit system;
+        specialArgs = {
+          inherit inputs unstablePkgs;
+        };
+        modules = [
+          ./hosts/default.nix
+          home-manager.nixosModules.home-manager
+          {
             home-manager.useGlobalPkgs = true;
             home-manager.useUserPackages = true;
             home-manager.extraSpecialArgs = {

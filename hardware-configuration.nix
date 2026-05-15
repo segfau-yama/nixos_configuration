@@ -1,9 +1,9 @@
 { ... }:
 {
-  # Explicit platform helps avoid accidental evaluation mismatches.
+  # プラットフォームを明示し、評価時の意図しない不一致を防ぐ。
   nixpkgs.hostPlatform = "x86_64-linux";
 
-  # Replace labels with your actual disk layout if needed.
+  # 必要に応じてラベルは実際のディスク構成に合わせて変更する。
   fileSystems."/" = {
     device = "/dev/disk/by-label/nixos";
     fsType = "ext4";

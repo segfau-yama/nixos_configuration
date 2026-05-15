@@ -1,48 +1,48 @@
 { ... }:
 {
   imports = [
-    # Core system modules
+    # システム共通モジュール
     ./modules/core/boot.nix
     ./modules/core/nix.nix
     ./modules/core/gc.nix
     ./modules/core/networking.nix
     ./modules/core/timezone.nix
 
-    # Locale and input method
+    # ロケールと言語入力
     ./modules/locale/locale.nix
     ./modules/locale/fonts.nix
     ./modules/locale/fcitx5-mozc.nix
 
-    # Desktop stack
+    # デスクトップ構成
     ./modules/desktop/display-manager.nix
     ./modules/desktop/hyprland.nix
     ./modules/desktop/ironbar.nix
     ./modules/desktop/terminal.nix
     ./modules/desktop/xdg-portal.nix
 
-    # Hardware acceleration
+    # ハードウェアアクセラレーション
     ./modules/hardware/opengl.nix
     ./modules/hardware/vulkan.nix
 
-    # Audio stack
+    # 音声構成
     ./modules/audio/pipewire.nix
     ./modules/audio/audio-utils.nix
 
-    # Gaming stack
+    # ゲーム構成
     ./modules/gaming/steam.nix
-    ./modules/gaming/lutris.nix
     ./modules/gaming/gamemode.nix
     ./modules/gaming/wine.nix
 
-    # Development/CAD
+    # 開発/CAD
     ./modules/development/zed.nix
     ./modules/development/tools.nix
 
-    # Media apps
+    # メディアアプリ
     ./modules/media/music.nix
+    ./modules/media/image.nix
     ./modules/media/video.nix
 
-    # Users
+    # ユーザー設定
     ./modules/users/default.nix
   ];
 
