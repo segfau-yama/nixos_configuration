@@ -93,8 +93,8 @@ GTX 1080 は NVIDIA 構成を使います。
 ### 1. パッケージを編集
 主な編集先:
 
-- システム全体: modules 配下 (例: modules/development/tools.nix)
-- ユーザー環境: home/home.nix の home.packages
+- システム全体の機能: modules 配下 (例: modules/gaming/steam.nix)
+- ユーザーアプリ: home 配下 (例: home/development.nix, home/gaming.nix)
 
 ### 2. 変更を保存して Git に追加
 flake は Git 追跡中のファイルを参照するため、変更後に add が必要です。

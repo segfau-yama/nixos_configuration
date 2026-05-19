@@ -1,0 +1,5 @@
+error:
+       … This command may have been run as non-root in a single-user Nix installation,
+       or the Nix daemon may have crashed.
+
+       error: opening lock file "/nix/var/nix/db/big-lock": Permission denied
