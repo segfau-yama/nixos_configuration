@@ -9,6 +9,7 @@
       "audio"
       "video"
       "input"
+      "seat"
     ];
     shell = pkgs.zsh;
   };

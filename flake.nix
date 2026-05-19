@@ -1,5 +1,5 @@
 {
-  description = "Modular NixOS desktop: Wayland + Hyprland + NVIDIA + Gaming + Dev + CAD";
+  description = "Modular NixOS desktop: Wayland + Niri + NVIDIA + Gaming + Dev + CAD";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-25.05";

@@ -5,13 +5,9 @@
     defaultTimeout = 5000;
   };
 
-  services.hyprpaper = {
+  services.swaybg = {
     enable = true;
-    settings = {
-      splash = false;
-      ipc = true;
-      preload = [ "/usr/share/backgrounds/cyber.png" ];
-      wallpaper = [ "eDP-1,/usr/share/backgrounds/cyber.png" ];
-    };
+    image = "/usr/share/backgrounds/cyber.png";
+    mode = "fill";
   };
 }

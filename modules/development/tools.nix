@@ -17,6 +17,5 @@
     pkg-config
     nil
     nixfmt-rfc-style
-    nushell
   ];
 }

@@ -15,7 +15,7 @@
 
     # デスクトップ構成
     ./modules/desktop/display-manager.nix
-    ./modules/desktop/hyprland.nix
+    ./modules/desktop/niri.nix
     ./modules/desktop/ironbar.nix
     ./modules/desktop/terminal.nix
     ./modules/desktop/xdg-portal.nix
@@ -32,6 +32,7 @@
     ./modules/gaming/steam.nix
     ./modules/gaming/gamemode.nix
     ./modules/gaming/wine.nix
+    ./modules/gaming/lutris.nix
 
     # 開発/CAD
     ./modules/development/zed.nix

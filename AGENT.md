@@ -3,7 +3,7 @@
 NixOS の設定ファイル群を生成してください。
 
 目的は、
-「Wayland + Hyprland + NVIDIA + Gaming + 開発 + CAD」
+「Wayland + Niri + NVIDIA + Gaming + 開発 + CAD」
 に対応した、保守性の高い NixOS デスクトップ環境を構築することです。
 
 # 必須条件
@@ -30,8 +30,8 @@ NixOS の設定ファイル群を生成してください。
 - OpenGL / Vulkan
 
 ## デスクトップ
-- Hyprland
-- Waybar
+- Niri
+- IronBar
 - notification daemon
 - wallpaper manager
 - terminal emulator
@@ -98,8 +98,8 @@ locale/
 - mozc
 
 desktop/
-- hyprland
-- waybar
+- niri
+- ironbar
 - display manager
 - terminal
 - xdg portal
@@ -138,7 +138,7 @@ development/
 4. 各 module のコード
 5. home-manager 設定
 6. なぜその分割にしたか
-7. NVIDIA + Hyprland の注意点
+7. NVIDIA + Niri の注意点
 8. Wayland 特有の注意点
 9. rebuild 手順
 
@@ -163,9 +163,9 @@ development/
 - nvidiaSettings
 - package
 
-Wayland + Hyprland 前提で調整する
+Wayland + Niri 前提で調整する
 
-# Hyprland 要件
+# Niri 要件
 
 以下を含める
 
@@ -173,7 +173,7 @@ Wayland + Hyprland 前提で調整する
 - polkit
 - seatd
 - greetd または SDDM
-- waybar
+- ironbar
 - wallpaper
 - notification daemon
 

@@ -5,7 +5,7 @@
     ./browser.nix
     ./sns.nix
     ./services.nix
-    ./hyprland.nix
+    ./niri.nix
     ./tofi.nix
     ./ironbar.nix
   ];

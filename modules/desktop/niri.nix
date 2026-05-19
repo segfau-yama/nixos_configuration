@@ -1,18 +1,17 @@
 { pkgs, ... }:
 {
-  programs.hyprland = {
-    enable = true;
-    xwayland.enable = true;
-  };
+  programs.niri.enable = true;
 
   programs.dconf.enable = true;
 
   services.dbus.enable = true;
 
   environment.systemPackages = with pkgs; [
-    hyprpaper
+    niri
+    swaybg
     mako
     wl-clipboard
     wayshot
+    wlsunset
   ];
 }
