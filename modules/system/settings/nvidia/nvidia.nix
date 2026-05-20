@@ -16,8 +16,12 @@
       powerManagement.finegrained = false;
       open = false;           # オープンソースカーネルモジュールは無効
       nvidiaSettings = true;  # nvidia-settings GUI を有効化
-      package = config.boot.kernelPackages.nvidiaPackages.production
-        or config.boot.kernelPackages.nvidiaPackages.stable;
+      # `or` は左辺の属性が attrset に存在しない場合にのみ右辺へフォールバックする
+      # Nix 組み込み構文。nixpkgs がそのカーネルで production を提供していない場合に
+      # 自動的に stable へ切り替わる。
+      package =
+        let np = config.boot.kernelPackages.nvidiaPackages;
+        in np.production or np.stable;
     };
 
     # OpenGL は opengl (DRY Aspect) から継承する。

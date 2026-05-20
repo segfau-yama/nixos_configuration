@@ -12,12 +12,18 @@
       ];
     };
 
-    # GTK/Qt/X アプリが fcitx5 を入力方式として認識するための環境変数。
+    # Wayland 環境での入力方式環境変数。
+    #
+    # GTK_IM_MODULE / QT_IM_MODULE は設定しない:
+    #   GTK4 / Qt6 の Wayland ネイティブアプリは text-input-v3 プロトコルを直接使う。
+    #   これらの変数を設定すると XIM ブリッジ経由の入力になり、
+    #   Wayland ネイティブ IME が無効化されて日本語入力が壊れるケースがある。
+    #
+    # XMODIFIERS は残す:
+    #   XWayland 上で動作するレガシーアプリ (一部 Electron / X11 アプリ) に必要。
     environment.sessionVariables = {
-      GTK_IM_MODULE = "fcitx";
-      QT_IM_MODULE  = "fcitx";
-      XMODIFIERS    = "@im=fcitx";
-      INPUT_METHOD  = "fcitx";
+      XMODIFIERS   = "@im=fcitx";
+      INPUT_METHOD = "fcitx";
     };
   };
 }
