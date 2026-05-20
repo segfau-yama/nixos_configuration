@@ -2,7 +2,7 @@
 {
   # system-desktop (NixOS): 日本語デスクトップ環境の共通基盤 (Inheritance Aspect)。
   # すべてのデスクトップホストが共通して必要とするフィーチャーを一箇所にまとめる。
-  # GPU 固有 (nvidia / amd) やオプション機能 (development / hdd) はホスト側で追加する。
+  # GPU 固有 (nvidia / amd) やオプション機能 (development / storage) はホスト側で追加する。
   #
   # 継承関係:
   #   system-base     → Nix 設定 / GC / ブート / ネットワーク / stateVersion

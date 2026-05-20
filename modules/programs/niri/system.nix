@@ -11,12 +11,12 @@
 
     environment.systemPackages = with pkgs; [
       # niri は programs.niri.enable で自動インストール済み
-      # mako / swaybg は HM services.mako / services.swaybg で管理済み
+      # mako / swww は HM services.mako / systemd.user.services で管理済み
       wl-clipboard  # Wayland クリップボード
       wayshot       # スクリーンショット
       wlsunset      # ブルーライトカット (夜間モード)
       wezterm       # ターミナルエミュレーター
-      pavucontrol   # PipeWire/PA GUI ボリュームコントローラー
+      pwvucontrol   # PipeWire ネイティブ GUI ボリュームコントローラー (Rust)
       playerctl     # メディアキーコントロール
       pamixer       # コマンドラインボリューム操作
       ironbar       # IronBar ステータスバー

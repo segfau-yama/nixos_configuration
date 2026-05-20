@@ -1,6 +1,6 @@
 { ... }:
 {
-  flake.modules.nixos.nixos-with-hdd = { ... }: {
+  flake.modules.nixos.nixos-base = { ... }: {
     imports = [ ../../../nixos/hardware-configuration.nix ];
   };
 }

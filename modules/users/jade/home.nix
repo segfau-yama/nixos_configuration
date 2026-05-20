@@ -1,20 +1,21 @@
 { inputs, ... }:
 let
-  username = "suichan";
+  username = "jade";
 in
 {
-  # suichan (Home Manager): デスクトップ全機能を組み合わせたメインユーザー設定。
+  # jade (Home Manager): デスクトップ全機能を組み合わせたメインユーザー設定。
   flake.modules.homeManager."${username}" = { ... }: {
     imports = with inputs.self.modules.homeManager; [
       niri          # Wayland コンポジター設定 (config.kdl)
       ironbar       # ステータスバー
       notifications # 通知 + 壁紙
-      development   # 開発ツール群
+      programming   # プログラミングツール群
       gaming        # Lutris + Wine
       media         # Spotify + mpv
       browser       # Chromium
       sns           # Discord 他 SNS クライアント
-      cad           # KiCad + FreeCAD
+      electronics   # KiCad + ngspice + gerbv
+      mechanical    # FreeCAD + PrusaSlicer + MeshLab + OpenSCAD
     ];
 
     home.username = "${username}";

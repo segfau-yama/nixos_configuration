@@ -1,13 +1,13 @@
 { inputs, ... }:
 let
-  username = "suichan";
+  username = "jade";
 in
 {
-  # suichan (NixOS): メインユーザーの定義と Home Manager 統合。
+  # jade (NixOS): メインユーザーの定義と Home Manager 統合。
   flake.modules.nixos."${username}" = { pkgs, ... }: {
     users.users."${username}" = {
       isNormalUser = true;
-      description = "Suichan";
+      description = "Jade";
       extraGroups = [
         "wheel"
         "networkmanager"

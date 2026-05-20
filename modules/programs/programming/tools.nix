@@ -1,8 +1,8 @@
 { ... }:
 {
-  # development/tools (Home Manager): 汎用 CLI ツール群。
-  # 他の development/* ファイルと同じ flake.modules.homeManager.development に追記 (Collector Aspect)。
-  flake.modules.homeManager.development = { pkgs, ... }: {
+  # programming/tools (Home Manager): 汎用 CLI ツール群。
+  # 他の programming/* ファイルと同じ flake.modules.homeManager.programming に追記 (Collector Aspect)。
+  flake.modules.homeManager.programming = { pkgs, ... }: {
     home.packages = with pkgs; [
       git         # バージョン管理
       xh          # 使いやすい HTTP クライアント
