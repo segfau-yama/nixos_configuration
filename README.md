@@ -41,6 +41,15 @@ NIX_CPU=aarch64-linux NIX_GPU=default sudo nixos-install --impure --flake .#nixo
 ## 新規インストール手順
 以下は UEFI 前提の手順です。
 
+> **root シェルへの切り替え（推奨）**
+>
+> インストール作業は多くのコマンドに root 権限が必要です。
+> 最初に以下を実行して root シェルに切り替えると、以降の `sudo` を省略できます。
+>
+> `sudo -i`
+>
+> root シェルに切り替えない場合は、各コマンドの先頭に `sudo` を付けて実行してください。
+
 ### 1. NixOS インストーラで起動
 - NixOS インストールメディアで起動
 - ネットワーク接続を確認
@@ -48,41 +57,44 @@ NIX_CPU=aarch64-linux NIX_GPU=default sudo nixos-install --impure --flake .#nixo
 ### 2. ディスクを作成
 以下は例として /dev/nvme0n1 を使用します。実際のデバイス名は lsblk で確認してください。
 
-	lsblk -f
-	parted -s /dev/nvme0n1 mklabel gpt
-	parted -s /dev/nvme0n1 mkpart ESP fat32 1MiB 1GiB
-	parted -s /dev/nvme0n1 set 1 esp on
-	parted -s /dev/nvme0n1 mkpart nixos ext4 1GiB 57GiB
-	parted -s /dev/nvme0n1 mkpart swap linux-swap 57GiB 100%
-	mkfs.fat -F 32 -n boot /dev/nvme0n1p1
-	mkfs.ext4 -L nixos /dev/nvme0n1p2
-	mkswap -L swap /dev/nvme0n1p3
+	sudo lsblk -f
+	sudo parted -s /dev/nvme0n1 mklabel gpt
+	sudo parted -s /dev/nvme0n1 mkpart ESP fat32 1MiB 1GiB
+	sudo parted -s /dev/nvme0n1 set 1 esp on
+	sudo parted -s /dev/nvme0n1 mkpart nixos ext4 1GiB 57GiB
+	sudo parted -s /dev/nvme0n1 mkpart swap linux-swap 57GiB 100%
+	sudo mkfs.fat -F 32 -n boot /dev/nvme0n1p1
+	sudo mkfs.ext4 -L nixos /dev/nvme0n1p2
+	sudo mkswap -L swap /dev/nvme0n1p3
 
 ### 3. マウント
-	mount /dev/disk/by-label/nixos /mnt
-	mkdir -p /mnt/boot
-	mount /dev/disk/by-label/boot /mnt/boot
-	swapon /dev/disk/by-label/swap
+	sudo mount /dev/disk/by-label/nixos /mnt
+	sudo mkdir -p /mnt/boot
+	sudo mount /dev/disk/by-label/boot /mnt/boot
+	sudo swapon /dev/disk/by-label/swap
 
 ### 4. このリポジトリを配置
-インストーラが生成した /mnt/etc/nixos は非空のため、clone はできません。
-既存ディレクトリに git を初期化して取り込みます。
+マウント直後は `/mnt/etc/nixos` が存在しないため、先にディレクトリを作成してから git を初期化します。
+`/mnt` 以下は root 所有となるため、git コマンドにも `sudo` が必要です。
 
+	sudo mkdir -p /mnt/etc/nixos
 	cd /mnt/etc/nixos
-	git init
-	git remote add origin https://github.com/segfau-yama/nixos_configuration.git
-	git fetch origin
-	git checkout -t origin/main
+	sudo git init
+	sudo git remote add origin https://github.com/segfau-yama/nixos_configuration.git
+	sudo git fetch origin
+	sudo git checkout -t origin/main
 
 ### 5. ハードウェア設定を実機で再生成
-この手順で生成される hardware-configuration.nix は実機情報を含むため必須です。
+`nixos-generate-config` を実行すると、リポジトリ内の placeholder `hardware-configuration.nix` が
+実機の実情に即した内容で上書きされます。
 
-	nixos-generate-config --root /mnt
+	sudo nixos-generate-config --root /mnt
 
 ### 6. flake 用にファイルを追跡
-flake は Git 追跡ファイルのみ参照するため、インストール前に add します。
+flake は Git 追跡ファイルのみを参照するため、インストール前に add します。
+(上書きされた hardware-configuration.nix もここで追跡します。)
 
-	git add .
+	sudo git add .
 
 ### 7. インストール実行
 
@@ -110,7 +122,100 @@ NIX_CPU=aarch64-linux NIX_GPU=default sudo nixos-install --impure --flake .#nixo
 
 インストール後に再起動:
 
-	reboot
+	sudo reboot
+
+## 他のインストール環境のメモ
+
+### 仮想マシン (QEMU/KVM ・ VirtualBox ・ VMware)
+
+QEMU/KVM などの VM にインストールする場合の手順です。ここでは 20GiB の `/dev/vda` (virtio ディスク) を例に使用します。
+
+> **注意 — UEFI の有効化**
+>
+> この設定は `systemd-boot` を使用するため、VM 側で必ず **UEFI 起動** を有効にしてください。
+> - **QEMU/KVM**: `virt-manager` の場合は「ファームウェア」に `OVMF` (レガシー BIOS ではなく) を選択
+> - **VirtualBox**: 設定 → システム → マザーボードタブ → EFI を有効化
+> - **VMware**: 　ファームウェアタイプに `UEFI` を選択
+
+> **GPU 設定**: GPU パススルーを行わない通常の VM では `NIX_GPU` の指定は不要です。デフォルトの `default` 構成が適用されます。
+
+#### パーティション構成表 (20GiB ディスク)
+
+| デバイス | ラベル | サイズ | 用途 |
+|---|---|---|---|
+| `/dev/vda1` | `boot` | 512MiB | EFI システムパーティション |
+| `/dev/vda2` | `nixos` | 約17.5GiB | NixOS ルート (ext4) |
+| `/dev/vda3` | `swap` | 約2GiB | スワップ |
+
+#### 0. root シェルに切り替え（推奨）
+
+	sudo -i
+
+以降のコマンドはすべて root として実行します。
+`sudo -i` を使わない場合は各コマンドの先頭に `sudo` を付けてください。
+
+#### 1. NixOS インストーラで起動
+- NixOS インストール ISO を VM の CDROM/ISO に設定して起動
+- ネットワーク接続を確認
+
+#### 2. ディスクを作成
+
+	sudo parted -s /dev/vda mklabel gpt
+	sudo parted -s /dev/vda mkpart ESP fat32 1MiB 512MiB
+	sudo parted -s /dev/vda set 1 esp on
+	sudo parted -s /dev/vda mkpart nixos ext4 512MiB 18GiB
+	sudo parted -s /dev/vda mkpart swap linux-swap 18GiB 100%
+	sudo mkfs.fat -F 32 -n boot /dev/vda1
+	sudo mkfs.ext4 -L nixos /dev/vda2
+	sudo mkswap -L swap /dev/vda3
+
+#### 3. マウント
+
+	sudo mount /dev/disk/by-label/nixos /mnt
+	sudo mkdir -p /mnt/boot
+	sudo mount /dev/disk/by-label/boot /mnt/boot
+	sudo swapon /dev/disk/by-label/swap
+
+#### 4. リポジトリを配置
+
+	sudo mkdir -p /mnt/etc/nixos
+	cd /mnt/etc/nixos
+	sudo git init
+	sudo git remote add origin https://github.com/segfau-yama/nixos_configuration.git
+	sudo git fetch origin
+	sudo git checkout -t origin/main
+
+#### 5. ハードウェア設定を実機で再生成
+リポジトリ内の placeholder `hardware-configuration.nix` が VM の実情に即した内容で上書きされます。
+
+	sudo nixos-generate-config --root /mnt
+
+#### 6. flake 用にファイルを追跡
+上書きされた hardware-configuration.nix もここで追跡します。
+
+	sudo git add .
+
+#### 7. インストール実行
+
+**x86_64 VM（通常の QEMU/KVM ・ VirtualBox ・ VMware）**
+```bash
+sudo nixos-install --impure --flake .#nixos
+```
+
+**aarch64 VM（Apple Silicon Mac 上の UTM など）**
+```bash
+NIX_CPU=aarch64-linux sudo nixos-install --impure --flake .#nixos
+```
+
+インストール後に再起動:
+
+	sudo reboot
+
+#### VM 導入後の注意事項
+
+- **生成される `hardware-configuration.nix` について**: `nixos-generate-config` が生成する `hardware-configuration.nix` には VM の実情に即した `hostPlatform` とディスク情報が含まれるため、そのまま使用してください。
+- **Niri の画面描画**: QEMU/KVM で Virgil3D を有効にすると GPU アクセラレーションが利きます。この設定の範囲外のため手動設定が必要です。
+- **クリップボード**: VM とホスト間のクリップボード共有には SPICE Guest Tools (別途インストール) が必要な場合があります。
 
 ## 既存システムへの反映
 既存 NixOS でこの設定を使う場合、インストール時の環境変数と同じ値を指定します：
