@@ -107,12 +107,22 @@ detect_hardware() {
   # GPU
   local gpu_info
   gpu_info=$(lspci 2>/dev/null | grep -iE 'VGA|3D|Display' || echo "")
-  if echo "$gpu_info" | grep -qi "NVIDIA"; then
+
+  # -- VM / paravirtual GPUs (checked FIRST to prevent false AMD/Intel matches)
+  # QXL, Virtio GPU, VMware SVGA, VirtualBox, Bochs VBE -- all need GPU_TYPE=none.
+  if echo "$gpu_info" | grep -qiE \
+       "QXL|Virtio.GPU|VMware.SVGA|VirtualBox.Graphics|Bochs|SVGA.II|paravirtual|Red Hat.*VGA"; then
+    GPU_TYPE="none"
+    GPU_BRAND=$(echo "$gpu_info" | head -1 \
+      | sed -E 's/^[0-9a-f:.]+[[:space:]]+(VGA compatible controller|3D controller|Display controller):[[:space:]]*//' \
+      | xargs)
+    [[ -z "$GPU_BRAND" ]] && GPU_BRAND="VM / paravirtual GPU"
+  elif echo "$gpu_info" | grep -qi "NVIDIA"; then
     GPU_TYPE="nvidia"
     GPU_BRAND=$(echo "$gpu_info" | grep -i "NVIDIA" | head -1 \
       | sed -E 's/.*\[([^]]+)\].*/\1/' \
       | grep -v '^$' || echo "NVIDIA GPU")
-  elif echo "$gpu_info" | grep -qi "AMD\|ATI"; then
+  elif echo "$gpu_info" | grep -qiE "AMD|ATI"; then
     GPU_TYPE="amd"
     GPU_BRAND=$(echo "$gpu_info" | grep -iE "AMD|ATI" | head -1 \
       | sed -E 's/.*\[([^]]+)\].*/\1/' \
@@ -123,9 +133,7 @@ detect_hardware() {
       | sed -E 's/.*\[([^]]+)\].*/\1/' \
       | grep -v '^$' || echo "Intel GPU")
   elif [[ -n "$gpu_info" ]]; then
-    # Generic VGA / VM graphics (VGA compatible controller, Virtio GPU,
-    # VMware SVGA, VirtualBox Graphics, QXL, Bochs VBE, etc.)
-    # Keep GPU_TYPE=none (no proprietary driver needed) but show the real name.
+    # Other unrecognised VGA device
     GPU_TYPE="none"
     GPU_BRAND=$(echo "$gpu_info" | head -1 \
       | sed -E 's/^[0-9a-f:.]+[[:space:]]+(VGA compatible controller|3D controller|Display controller):[[:space:]]*//' \
