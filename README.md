@@ -151,9 +151,35 @@ GPU が `none` 以外のとき、x86_64 環境では `hardware.graphics.enable32
 
 `setup.sh` は対話型の 3 フェーズインストーラーです。
 
+### ネットワークから取得して実行
+
+NixOS ライブ環境（インストール ISO 起動直後）では、まずネットワーク経由で `setup.sh` を取得します。
+
 ```bash
+# ネットワーク接続を確認
+ping -c 1 github.com
+
+# curl で取得して実行（推奨）
+curl -fsSL https://raw.githubusercontent.com/segfau-yama/nixos_configuration/main/setup.sh -o setup.sh
 sudo bash setup.sh
 ```
+
+`curl` が使えない場合は `wget` を使用します。
+
+```bash
+wget -O setup.sh https://raw.githubusercontent.com/segfau-yama/nixos_configuration/main/setup.sh
+sudo bash setup.sh
+```
+
+> **Wi-Fi の場合**  
+> NixOS ライブ環境では `wpa_supplicant` または `nmtui` で接続してから実行してください。
+> ```bash
+> # nmtui で Wi-Fi 設定（テキスト UI）
+> nmtui
+> # または wpa_cli
+> wpa_cli -i wlan0 scan
+> wpa_cli -i wlan0 scan_results
+> ```
 
 ### フェーズ 1: PC 設定
 

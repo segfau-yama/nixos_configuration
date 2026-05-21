@@ -1,22 +1,22 @@
 #!/usr/bin/env bash
-# setup.sh — NixOS インタラクティブセットアップスクリプト
+# setup.sh - NixOS interactive setup script
 #
-# 使い方:
+# Usage:
 #   bash setup.sh
 #
-# 流れ:
-#   1. PC の設定 (ハードウェア検出 / パーティション / ネットワーク / GPU / CPU)
-#   2. ユーザーの設定 (デフォルト or カスタム / GUI or CUI / プログラム選択)
-#   3. インストール (パーティション作成 / nixos-install / 再起動)
+# Phases:
+#   1. PC configuration (hardware detection / partitioning / GPU / CPU)
+#   2. User configuration (default or custom / GUI or CUI / program selection)
+#   3. Installation (partition / nixos-install / reboot)
 
 set -euo pipefail
 
-# ── 定数 ─────────────────────────────────────────────────────────────────────
+# -- Constants -----------------------------------------------------------------
 REPO_URL="https://github.com/segfau-yama/nixos_configuration.git"
 MOUNT_ROOT="/mnt"
 STATE_VERSION="25.05"
 
-# ── カラー定義 ────────────────────────────────────────────────────────────────
+# -- Color definitions ---------------------------------------------------------
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
@@ -27,30 +27,30 @@ BOLD='\033[1m'
 DIM='\033[2m'
 RESET='\033[0m'
 
-# ── ユーティリティ ────────────────────────────────────────────────────────────
+# -- Utilities -----------------------------------------------------------------
 info()      { echo -e "${CYAN}[INFO]${RESET}  $*"; }
 success()   { echo -e "${GREEN}[ OK ]${RESET}  $*"; }
 warn()      { echo -e "${YELLOW}[WARN]${RESET}  $*"; }
 error()     { echo -e "${RED}[ERR ]${RESET}  $*" >&2; exit 1; }
-step()      { echo -e "\n${BOLD}${BLUE}▶ $*${RESET}"; }
-separator() { echo -e "${DIM}────────────────────────────────────────────────────────${RESET}"; }
+step()      { echo -e "\n${BOLD}${BLUE}> $*${RESET}"; }
+separator() { echo -e "${DIM}--------------------------------------------------------${RESET}"; }
 
 banner() {
   echo -e "${BOLD}${CYAN}"
-  echo "══════════════════════════════════════════════════════════"
+  echo "=========================================================="
   echo "  $*"
-  echo "══════════════════════════════════════════════════════════"
+  echo "=========================================================="
   echo -e "${RESET}"
 }
 
 sub_banner() {
-  echo -e "\n${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
+  echo -e "\n${BOLD}------------------------------------------------------${RESET}"
   echo -e "${BOLD}  $*${RESET}"
-  echo -e "${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
+  echo -e "${BOLD}------------------------------------------------------${RESET}"
 }
 
-# ── グローバル変数 ─────────────────────────────────────────────────────────────
-# Phase 1: PC 設定
+# -- Global variables ----------------------------------------------------------
+# Phase 1: PC configuration
 DEVICE=""
 PART_BOOT=""
 PART_ROOT=""
@@ -64,25 +64,25 @@ TIMEZONE="Asia/Tokyo"
 SSH_ENABLED="false"
 STORAGE_ENABLED="false"
 GPU_TYPE="none"
-GPU_BRAND="検出されず"
+GPU_BRAND="not detected"
 CPU_TYPE="amd"
-CPU_BRAND="不明"
+CPU_BRAND="unknown"
 ARCH="x86_64-linux"
 
-# Phase 2: ユーザー設定
-declare -a USER_MODULE_NAMES=()   # host config の imports に並べるモジュール名
+# Phase 2: User configuration
+declare -a USER_MODULE_NAMES=()   # module names to list in host config imports
 declare -a CUSTOM_USERS=()        # "username:type:description:prog1 prog2..."
 JADE_SELECTED=false
 ADMIN_SELECTED=false
 HAS_GUI_USER=false
 NEEDS_PROGRAMMING_CLI=false
 
-# ─────────────────────────────────────────────────────────────────────────────
-# ハードウェア検出
-# ─────────────────────────────────────────────────────────────────────────────
+# -----------------------------------------------------------------------------
+# Hardware detection
+# -----------------------------------------------------------------------------
 detect_hardware() {
   # CPU
-  CPU_BRAND=$(grep -m1 'model name' /proc/cpuinfo 2>/dev/null | cut -d: -f2 | xargs || echo "不明")
+  CPU_BRAND=$(grep -m1 'model name' /proc/cpuinfo 2>/dev/null | cut -d: -f2 | xargs || echo "unknown")
   CPU_ARCH=$(uname -m)
   case "$CPU_ARCH" in
     x86_64)
@@ -124,30 +124,30 @@ detect_hardware() {
       | grep -v '^$' || echo "Intel GPU")
   else
     GPU_TYPE="none"
-    GPU_BRAND="検出されず (仮想マシン / GPU なし)"
+    GPU_BRAND="not detected (VM / no GPU)"
   fi
 }
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Phase 1: PC の設定
-# ─────────────────────────────────────────────────────────────────────────────
+# -----------------------------------------------------------------------------
+# Phase 1: PC configuration
+# -----------------------------------------------------------------------------
 phase1_pc_config() {
-  banner "NixOS インタラクティブセットアップ"
-  echo -e "  ${BOLD}ステップ 1/3: PC の設定${RESET}\n"
+  banner "NixOS Interactive Setup"
+  echo -e "  ${BOLD}Step 1/3: PC Configuration${RESET}\n"
 
   detect_hardware
 
-  # ── ハードウェア表示 ──────────────────────────────────────────────────────
-  step "ハードウェア検出結果"
+  # -- Display hardware info --------------------------------------------------
+  step "Hardware Detection Results"
   local mem_kb mem_gb
   mem_kb=$(grep MemTotal /proc/meminfo 2>/dev/null | awk '{print $2}' || echo 0)
   mem_gb=$(( mem_kb / 1024 / 1024 ))
   echo -e "  CPU    : ${BOLD}${CPU_BRAND}${RESET} (${CPU_TYPE})"
   echo -e "  GPU    : ${BOLD}${GPU_BRAND}${RESET} (${GPU_TYPE})"
-  echo -e "  メモリ  : ${BOLD}${mem_gb} GB${RESET}"
+  echo -e "  Memory : ${BOLD}${mem_gb} GB${RESET}"
   echo
 
-  step "ストレージデバイス"
+  step "Storage Devices"
   local -a disk_names=()
   local -a disk_info=()
   local idx=1
@@ -168,23 +168,23 @@ phase1_pc_config() {
     | sed 's|/dev/||')
 
   if [[ ${#disk_names[@]} -eq 0 ]]; then
-    error "ブロックデバイスが見つかりません。"
+    error "No block devices found."
   fi
 
-  # ── デバイス選択 ─────────────────────────────────────────────────────────
+  # -- Device selection ------------------------------------------------------
   echo
   local sel
   while true; do
-    read -rp "  インストール先の番号を入力 [1-${#disk_names[@]}]: " sel
+    read -rp "  Select install target [1-${#disk_names[@]}]: " sel
     if [[ "$sel" =~ ^[0-9]+$ ]] && (( sel >= 1 && sel <= ${#disk_names[@]} )); then
       DEVICE="/dev/${disk_names[$(( sel - 1 ))]}"
       break
     fi
-    warn "有効な番号を入力してください。"
+    warn "Please enter a valid number."
   done
-  success "インストール先: ${DEVICE}"
+  success "Install target: ${DEVICE}"
 
-  # パーティション名を決定
+  # Determine partition names
   if [[ "$DEVICE" =~ nvme|mmcblk ]]; then
     PART_BOOT="${DEVICE}p1"
     PART_ROOT="${DEVICE}p2"
@@ -195,96 +195,96 @@ phase1_pc_config() {
     PART_SWAP="${DEVICE}3"
   fi
 
-  # ── パーティション設定 ────────────────────────────────────────────────────
+  # -- Partition sizes -------------------------------------------------------
   echo
-  step "パーティション設定"
+  step "Partition Configuration"
   local input
-  read -rp "  EFI パーティション終了位置 (デフォルト: ${BOOT_END}): " input
+  read -rp "  EFI partition end (default: ${BOOT_END}): " input
   [[ -n "$input" ]] && BOOT_END="$input"
-  read -rp "  ルートパーティション終了位置 (デフォルト: ${ROOT_END}): " input
+  read -rp "  Root partition end (default: ${ROOT_END}): " input
   [[ -n "$input" ]] && ROOT_END="$input"
-  echo -e "  EFI: ${CYAN}${BOOT_END}${RESET}   Root: ${CYAN}${ROOT_END}${RESET}   Swap: 残り全て"
+  echo -e "  EFI: ${CYAN}${BOOT_END}${RESET}   Root: ${CYAN}${ROOT_END}${RESET}   Swap: rest"
 
-  # ── ホスト名 ─────────────────────────────────────────────────────────────
+  # -- Hostname --------------------------------------------------------------
   echo
-  step "ホスト名の設定"
-  read -rp "  ホスト名 (デフォルト: ${HOSTNAME}): " input
+  step "Hostname"
+  read -rp "  Hostname (default: ${HOSTNAME}): " input
   [[ -n "$input" ]] && HOSTNAME="$input"
-  success "ホスト名: ${HOSTNAME}"
+  success "Hostname: ${HOSTNAME}"
 
-  # ── キーボードレイアウト ──────────────────────────────────────────────────
+  # -- Keyboard layout -------------------------------------------------------
   echo
-  step "キーボードレイアウトの設定"
-  local kb_list=("jp106:日本語 JIS" "us:英語 US" "de:ドイツ語" "fr:フランス語")
+  step "Keyboard Layout"
+  local kb_list=("jp106:Japanese JIS" "us:English US" "de:German" "fr:French")
   local i=1
   for kb in "${kb_list[@]}"; do
     local kb_key="${kb%%:*}"
     local kb_label="${kb##*:}"
     if [[ "$i" -eq 1 ]]; then
-      echo -e "  ${BOLD}${i})${RESET} ${kb_key}  ${kb_label}  ${DIM}[デフォルト]${RESET}"
+      echo -e "  ${BOLD}${i})${RESET} ${kb_key}  ${kb_label}  ${DIM}[default]${RESET}"
     else
       echo -e "  ${BOLD}${i})${RESET} ${kb_key}  ${kb_label}"
     fi
     (( i++ ))
   done
-  echo -e "  ${BOLD}${i})${RESET} カスタム入力"
-  read -rp "  選択 [1-${i}] (Enter でデフォルト): " sel
+  echo -e "  ${BOLD}${i})${RESET} Custom"
+  read -rp "  Select [1-${i}] (Enter for default): " sel
   case "$sel" in
     1|"") KEYBOARD="jp106" ;;
     2)    KEYBOARD="us" ;;
     3)    KEYBOARD="de" ;;
     4)    KEYBOARD="fr" ;;
     5)
-      read -rp "  キーボードレイアウト名を入力: " input
+      read -rp "  Enter keyboard layout name: " input
       [[ -n "$input" ]] && KEYBOARD="$input"
       ;;
   esac
-  success "キーボード: ${KEYBOARD}"
+  success "Keyboard: ${KEYBOARD}"
 
-  # ── ロケール ─────────────────────────────────────────────────────────────
+  # -- Locale ----------------------------------------------------------------
   echo
-  step "言語・ロケールの設定"
-  local lc_list=("ja_JP.UTF-8:日本語" "en_US.UTF-8:英語 US" "zh_CN.UTF-8:中国語簡体字" "ko_KR.UTF-8:韓国語")
+  step "Locale"
+  local lc_list=("ja_JP.UTF-8:Japanese" "en_US.UTF-8:English US" "zh_CN.UTF-8:Chinese Simplified" "ko_KR.UTF-8:Korean")
   i=1
   for lc in "${lc_list[@]}"; do
     local lc_key="${lc%%:*}"
     local lc_label="${lc##*:}"
     if [[ "$i" -eq 1 ]]; then
-      echo -e "  ${BOLD}${i})${RESET} ${lc_key}  ${lc_label}  ${DIM}[デフォルト]${RESET}"
+      echo -e "  ${BOLD}${i})${RESET} ${lc_key}  ${lc_label}  ${DIM}[default]${RESET}"
     else
       echo -e "  ${BOLD}${i})${RESET} ${lc_key}  ${lc_label}"
     fi
     (( i++ ))
   done
-  echo -e "  ${BOLD}${i})${RESET} カスタム入力"
-  read -rp "  選択 [1-${i}] (Enter でデフォルト): " sel
+  echo -e "  ${BOLD}${i})${RESET} Custom"
+  read -rp "  Select [1-${i}] (Enter for default): " sel
   case "$sel" in
     1|"") LOCALE="ja_JP.UTF-8" ;;
     2)    LOCALE="en_US.UTF-8" ;;
     3)    LOCALE="zh_CN.UTF-8" ;;
     4)    LOCALE="ko_KR.UTF-8" ;;
     5)
-      read -rp "  ロケール名を入力 (例: en_GB.UTF-8): " input
+      read -rp "  Enter locale (e.g. en_GB.UTF-8): " input
       [[ -n "$input" ]] && LOCALE="$input"
       ;;
   esac
-  success "ロケール: ${LOCALE}"
+  success "Locale: ${LOCALE}"
 
-  # ── タイムゾーン ──────────────────────────────────────────────────────────
+  # -- Timezone --------------------------------------------------------------
   echo
-  step "タイムゾーンの設定"
+  step "Timezone"
   local tz_list=("Asia/Tokyo" "UTC" "America/New_York" "America/Los_Angeles" "Europe/London" "Europe/Berlin")
   i=1
   for tz in "${tz_list[@]}"; do
     if [[ "$i" -eq 1 ]]; then
-      echo -e "  ${BOLD}${i})${RESET} ${tz}  ${DIM}[デフォルト]${RESET}"
+      echo -e "  ${BOLD}${i})${RESET} ${tz}  ${DIM}[default]${RESET}"
     else
       echo -e "  ${BOLD}${i})${RESET} ${tz}"
     fi
     (( i++ ))
   done
-  echo -e "  ${BOLD}${i})${RESET} カスタム入力"
-  read -rp "  選択 [1-${i}] (Enter でデフォルト): " sel
+  echo -e "  ${BOLD}${i})${RESET} Custom"
+  read -rp "  Select [1-${i}] (Enter for default): " sel
   case "$sel" in
     1|"") TIMEZONE="Asia/Tokyo" ;;
     2)    TIMEZONE="UTC" ;;
@@ -293,113 +293,113 @@ phase1_pc_config() {
     5)    TIMEZONE="Europe/London" ;;
     6)    TIMEZONE="Europe/Berlin" ;;
     7)
-      read -rp "  タイムゾーンを入力 (例: Asia/Seoul): " input
+      read -rp "  Enter timezone (e.g. Asia/Seoul): " input
       [[ -n "$input" ]] && TIMEZONE="$input"
       ;;
   esac
-  success "タイムゾーン: ${TIMEZONE}"
+  success "Timezone: ${TIMEZONE}"
 
-  # ── SSH ──────────────────────────────────────────────────────────────────
+  # -- SSH -------------------------------------------------------------------
   echo
-  step "SSH の設定"
-  read -rp "  SSH を有効にしますか？ [y/N]: " input
+  step "SSH"
+  read -rp "  Enable SSH? [y/N]: " input
   if [[ "$input" =~ ^[Yy]$ ]]; then
     SSH_ENABLED="true"
-    success "SSH: 有効"
+    success "SSH: enabled"
   else
     SSH_ENABLED="false"
-    info "SSH: 無効"
+    info "SSH: disabled"
   fi
 
-  # ── nix-auto-storage ──────────────────────────────────────────────────────
+  # -- nix-auto-storage ------------------------------------------------------
   echo
-  step "ストレージの設定"
-  echo -e "  ${DIM}非ブートドライブが存在する場合、/nix をそこへ配置します。${RESET}"
-  read -rp "  nix-auto-storage を有効にしますか？ [y/N]: " input
+  step "Storage Configuration"
+  echo -e "  ${DIM}If a non-boot drive exists, /nix will be placed on it.${RESET}"
+  read -rp "  Enable nix-auto-storage? [y/N]: " input
   if [[ "$input" =~ ^[Yy]$ ]]; then
     STORAGE_ENABLED="true"
-    success "nix-auto-storage: 有効"
+    success "nix-auto-storage: enabled"
   else
     STORAGE_ENABLED="false"
-    info "nix-auto-storage: 無効"
+    info "nix-auto-storage: disabled"
   fi
 
-  # ── GPU 確認 ─────────────────────────────────────────────────────────────
+  # -- GPU -------------------------------------------------------------------
   echo
-  step "GPU の設定"
-  echo -e "  検出された GPU: ${BOLD}${GPU_BRAND}${RESET} (${GPU_TYPE})"
+  step "GPU Configuration"
+  echo -e "  Detected GPU: ${BOLD}${GPU_BRAND}${RESET} (${GPU_TYPE})"
   echo
-  local gpu_opts=("nvidia:NVIDIA proprietary ドライバー" "amd:AMD open-source ドライバー" "intel:Intel modesetting ドライバー" "none:GPU なし / 仮想マシン")
+  local gpu_opts=("nvidia:NVIDIA proprietary driver" "amd:AMD open-source driver" "intel:Intel modesetting driver" "none:No GPU / Virtual Machine")
   i=1
   for opt in "${gpu_opts[@]}"; do
     local key="${opt%%:*}"
     local label="${opt##*:}"
     if [[ "$key" == "$GPU_TYPE" ]]; then
-      echo -e "  ${BOLD}${i})${RESET} ${key}  ${label}  ${GREEN}[検出値 ✓]${RESET}"
+      echo -e "  ${BOLD}${i})${RESET} ${key}  ${label}  ${GREEN}[detected]${RESET}"
     else
       echo -e "  ${BOLD}${i})${RESET} ${key}  ${label}"
     fi
     (( i++ ))
   done
-  read -rp "  選択 [1-4] (Enter で検出値を使用): " sel
+  read -rp "  Select [1-4] (Enter to use detected value): " sel
   case "$sel" in
     1) GPU_TYPE="nvidia" ;;
     2) GPU_TYPE="amd" ;;
     3) GPU_TYPE="intel" ;;
     4) GPU_TYPE="none" ;;
-    "") : ;; # 検出値を維持
+    "") : ;; # keep detected value
   esac
   success "GPU: ${GPU_TYPE}"
 
-  # ── CPU 確認 ─────────────────────────────────────────────────────────────
+  # -- CPU -------------------------------------------------------------------
   echo
-  step "CPU の設定"
-  echo -e "  検出された CPU: ${BOLD}${CPU_BRAND}${RESET} (${CPU_TYPE})"
+  step "CPU Configuration"
+  echo -e "  Detected CPU: ${BOLD}${CPU_BRAND}${RESET} (${CPU_TYPE})"
   echo
-  local cpu_opts=("amd:AMD マイクロコード" "intel:Intel マイクロコード" "aarch64:ARM64 (マイクロコード不要)")
+  local cpu_opts=("amd:AMD microcode" "intel:Intel microcode" "aarch64:ARM64 (no microcode needed)")
   i=1
   for opt in "${cpu_opts[@]}"; do
     local key="${opt%%:*}"
     local label="${opt##*:}"
     if [[ "$key" == "$CPU_TYPE" ]]; then
-      echo -e "  ${BOLD}${i})${RESET} ${key}  ${label}  ${GREEN}[検出値 ✓]${RESET}"
+      echo -e "  ${BOLD}${i})${RESET} ${key}  ${label}  ${GREEN}[detected]${RESET}"
     else
       echo -e "  ${BOLD}${i})${RESET} ${key}  ${label}"
     fi
     (( i++ ))
   done
-  read -rp "  選択 [1-3] (Enter で検出値を使用): " sel
+  read -rp "  Select [1-3] (Enter to use detected value): " sel
   case "$sel" in
     1) CPU_TYPE="amd";     ARCH="x86_64-linux" ;;
     2) CPU_TYPE="intel";   ARCH="x86_64-linux" ;;
     3) CPU_TYPE="aarch64"; ARCH="aarch64-linux" ;;
-    "") : ;; # 検出値を維持
+    "") : ;; # keep detected value
   esac
   success "CPU: ${CPU_TYPE}"
 
   echo
-  success "Phase 1 完了: PC の設定が確定しました。"
+  success "Phase 1 complete: PC configuration finalized."
 }
 
-# ─────────────────────────────────────────────────────────────────────────────
-# GUI プログラム選択 (GUI アプリのみ・チェックボックス式)
-# 引数: 選択結果を格納する名前参照変数 (bash nameref)
-# ─────────────────────────────────────────────────────────────────────────────
+# -----------------------------------------------------------------------------
+# GUI program selection (checkbox style)
+# Argument: nameref variable to store results
+# -----------------------------------------------------------------------------
 select_programs_gui() {
   local -n _result_ref=$1
 
-  # プログラム定義: "module_name:説明"
+  # Program definitions: "module_name:description"
   local -a GUI_PROG_DEFS=(
-    "browser:Chromium ウェブブラウザー"
-    "gaming:Steam + Lutris + Wine (ゲーム)"
-    "media:Spotify + mpv (音楽・動画)"
-    "sns:Discord (SNS チャット)"
-    "kicad:KiCad (電気・電子設計)"
+    "browser:Chromium web browser"
+    "gaming:Steam + Lutris + Wine (gaming)"
+    "media:Spotify + mpv (music & video)"
+    "sns:Discord (chat)"
+    "kicad:KiCad (EDA / PCB design)"
     "freecad:FreeCAD + MeshLab (3D CAD)"
-    "zed:Zed エディター (unstable 最新版)"
+    "zed:Zed editor (latest via unstable)"
   )
 
-  # 選択状態 (true/false の配列)
+  # Selection state (true/false array)
   local -a selected=()
   for _ in "${GUI_PROG_DEFS[@]}"; do
     selected+=(false)
@@ -408,9 +408,9 @@ select_programs_gui() {
   local draw_menu
   draw_menu() {
     echo
-    sub_banner "GUI アプリの選択"
-    echo -e "  ${DIM}番号を入力して選択/解除、0 で確定${RESET}\n"
-    echo -e "  ${MAGENTA}[★]${RESET} ${BOLD}desktop${RESET}      Niri デスクトップ環境 ${DIM}(必須・変更不可)${RESET}"
+    sub_banner "Select GUI Applications"
+    echo -e "  ${DIM}Enter a number to toggle, 0 to confirm${RESET}\n"
+    echo -e "  ${MAGENTA}[*]${RESET} ${BOLD}desktop${RESET}      Niri desktop environment ${DIM}(required)${RESET}"
     local j
     for (( j=0; j<${#GUI_PROG_DEFS[@]}; j++ )); do
       local prog="${GUI_PROG_DEFS[$j]%%:*}"
@@ -428,7 +428,7 @@ select_programs_gui() {
   while true; do
     draw_menu
     local input
-    read -rp "  番号を入力 (0 = 確定): " input
+    read -rp "  Enter number (0 = confirm): " input
     if [[ "$input" == "0" ]]; then
       break
     elif [[ "$input" =~ ^[0-9]+$ ]] && (( input >= 1 && input <= ${#GUI_PROG_DEFS[@]} )); then
@@ -439,11 +439,11 @@ select_programs_gui() {
         selected[$idx]=true
       fi
     else
-      warn "有効な番号を入力してください (0-${#GUI_PROG_DEFS[@]})。"
+      warn "Please enter a valid number (0-${#GUI_PROG_DEFS[@]})."
     fi
   done
 
-  # 結果を構築 (desktop は必須で先頭)
+  # Build result (desktop is mandatory and comes first)
   _result_ref=("desktop")
   local j
   for (( j=0; j<${#GUI_PROG_DEFS[@]}; j++ )); do
@@ -453,17 +453,17 @@ select_programs_gui() {
   done
 }
 
-# ─────────────────────────────────────────────────────────────────────────────
-# 開発ツール選択 (GUI / CUI 共通・チェックボックス式)
-# ─────────────────────────────────────────────────────────────────────────────
+# -----------------------------------------------------------------------------
+# Development tool selection (GUI / CUI common, checkbox style)
+# -----------------------------------------------------------------------------
 select_programs_dev() {
   local -n _result_ref=$1
 
   local -a DEV_PROG_DEFS=(
-    "programming:シェル設定 (Zsh / Nushell / Direnv)"
-    "lang:言語ツールチェーン (Rust / C++ / Python)"
-    "nix-tools:Nix エコシステム (nix-index / devenv / nil)"
-    "cli-tools:汎用 CLI ツール (git / xh / jaq / just)"
+    "programming:Shell setup (Zsh / Nushell / Direnv)"
+    "lang:Language toolchains (Rust / C++ / Python)"
+    "nix-tools:Nix ecosystem (nix-index / devenv / nil)"
+    "cli-tools:General CLI tools (git / xh / jaq / just)"
   )
   local -a selected=()
   for _ in "${DEV_PROG_DEFS[@]}"; do
@@ -473,8 +473,8 @@ select_programs_dev() {
   local draw_menu
   draw_menu() {
     echo
-    sub_banner "開発ツールの選択 (GUI / CUI 共通)"
-    echo -e "  ${DIM}番号を入力して選択/解除、0 で確定${RESET}\n"
+    sub_banner "Select Development Tools (GUI / CUI)"
+    echo -e "  ${DIM}Enter a number to toggle, 0 to confirm${RESET}\n"
     local j
     for (( j=0; j<${#DEV_PROG_DEFS[@]}; j++ )); do
       local prog="${DEV_PROG_DEFS[$j]%%:*}"
@@ -492,7 +492,7 @@ select_programs_dev() {
   while true; do
     draw_menu
     local input
-    read -rp "  番号を入力 (0 = 確定): " input
+    read -rp "  Enter number (0 = confirm): " input
     if [[ "$input" == "0" ]]; then
       break
     elif [[ "$input" =~ ^[0-9]+$ ]] && (( input >= 1 && input <= ${#DEV_PROG_DEFS[@]} )); then
@@ -503,7 +503,7 @@ select_programs_dev() {
         selected[$idx]=true
       fi
     else
-      warn "有効な番号を入力してください。"
+      warn "Please enter a valid number."
     fi
   done
 
@@ -516,22 +516,22 @@ select_programs_dev() {
   done
 }
 
-# ─────────────────────────────────────────────────────────────────────────────
-# カスタムユーザー追加
-# ─────────────────────────────────────────────────────────────────────────────
+# -----------------------------------------------------------------------------
+# Add custom user
+# -----------------------------------------------------------------------------
 add_custom_user() {
   echo
-  sub_banner "カスタムユーザーの設定"
+  sub_banner "Custom User Configuration"
 
-  # ユーザー名
+  # Username
   local uname=""
   while true; do
-    read -rp "  ユーザー名を入力してください: " uname
+    read -rp "  Enter username: " uname
     if [[ -z "$uname" ]]; then
-      warn "ユーザー名を入力してください。"
+      warn "Username cannot be empty."
       continue
     fi
-    # 重複チェック
+    # Duplicate check
     local dup=false
     for existing in "${USER_MODULE_NAMES[@]:-}"; do
       if [[ "$existing" == "$uname" ]]; then
@@ -540,37 +540,37 @@ add_custom_user() {
       fi
     done
     if [[ "$dup" == "true" ]]; then
-      warn "${uname} はすでに追加されています。別の名前を入力してください。"
+      warn "${uname} is already added. Please choose a different name."
       continue
     fi
     break
   done
 
-  # 説明
+  # Display name
   local default_desc
   default_desc="$(echo "${uname:0:1}" | tr '[:lower:]' '[:upper:]')${uname:1}"
   local udesc
-  read -rp "  説明を入力してください (デフォルト: ${default_desc}): " udesc
+  read -rp "  Display name (default: ${default_desc}): " udesc
   [[ -z "$udesc" ]] && udesc="$default_desc"
 
-  # ユーザータイプ
+  # User type
   local utype=""
   echo
-  echo -e "  ${BOLD}ユーザータイプを選択してください:${RESET}"
-  echo -e "  ${BOLD}1)${RESET} GUI  デスクトップ環境あり (Niri / Wayland)"
-  echo -e "  ${BOLD}2)${RESET} CUI  ターミナルのみ"
+  echo -e "  ${BOLD}Select user type:${RESET}"
+  echo -e "  ${BOLD}1)${RESET} GUI  With desktop environment (Niri / Wayland)"
+  echo -e "  ${BOLD}2)${RESET} CUI  Terminal only"
   while true; do
-    read -rp "  選択 [1-2]: " sel
+    read -rp "  Select [1-2]: " sel
     case "$sel" in
       1) utype="gui"; break ;;
       2) utype="cui"; break ;;
-      *) warn "1 または 2 を入力してください。" ;;
+      *) warn "Please enter 1 or 2." ;;
     esac
   done
 
-  # プログラム選択
-  # GUI ユーザー: GUI アプリ → 開発ツール の順に選択
-  # CUI ユーザー: 開発ツールのみ選択
+  # Program selection
+  # GUI user: GUI apps -> dev tools
+  # CUI user: dev tools only
   local -a gui_progs=()
   local -a dev_progs=()
 
@@ -581,11 +581,11 @@ add_custom_user() {
 
   select_programs_dev dev_progs
 
-  # 全プログラムを結合
+  # Merge all programs
   local -a uprograms=()
   uprograms=("${gui_progs[@]:-}" "${dev_progs[@]:-}")
 
-  # programming が選択されているか確認 (NixOS 側で nix-ld を有効化するため)
+  # Check if programming is selected (to enable nix-ld on NixOS side)
   for p in "${uprograms[@]:-}"; do
     if [[ "$p" == "programming" ]]; then
       NEEDS_PROGRAMMING_CLI=true
@@ -593,71 +593,71 @@ add_custom_user() {
     fi
   done
 
-  # CUSTOM_USERS に追加 (format: "username:type:description:prog1 prog2 ...")
+  # Add to CUSTOM_USERS (format: "username:type:description:prog1 prog2 ...")
   local prog_str="${uprograms[*]:-}"
   CUSTOM_USERS+=("${uname}:${utype}:${udesc}:${prog_str}")
   USER_MODULE_NAMES+=("$uname")
 
-  success "${uname} を追加しました。(${utype} / プログラム: ${prog_str:-なし})"
+  success "Added ${uname}. (${utype} / programs: ${prog_str:-none})"
 }
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Phase 2: ユーザーの設定
-# ─────────────────────────────────────────────────────────────────────────────
+# -----------------------------------------------------------------------------
+# Phase 2: User configuration
+# -----------------------------------------------------------------------------
 phase2_user_config() {
   echo
-  banner "ステップ 2/3: ユーザーの設定"
+  banner "Step 2/3: User Configuration"
 
   while true; do
-    # 現在のユーザー一覧
+    # Current user list
     if [[ ${#USER_MODULE_NAMES[@]} -gt 0 ]]; then
-      echo -e "  ${DIM}追加済みユーザー: ${USER_MODULE_NAMES[*]}${RESET}"
+      echo -e "  ${DIM}Added users: ${USER_MODULE_NAMES[*]}${RESET}"
       echo
     fi
 
-    # 選択肢
-    echo -e "  ${BOLD}ユーザーを追加してください:${RESET}"
+    # Choices
+    echo -e "  ${BOLD}Add a user:${RESET}"
 
     if [[ "$JADE_SELECTED" == "true" ]]; then
-      echo -e "  ${DIM}1) jade   通常ユーザー (GUI デスクトップ)  [追加済み ✓]${RESET}"
+      echo -e "  ${DIM}1) jade   standard user (GUI desktop)  [added]${RESET}"
     else
-      echo -e "  ${BOLD}1)${RESET} jade   通常ユーザー (GUI デスクトップ)  ${DIM}[デフォルト設定]${RESET}"
+      echo -e "  ${BOLD}1)${RESET} jade   standard user (GUI desktop)  ${DIM}[default config]${RESET}"
     fi
 
     if [[ "$ADMIN_SELECTED" == "true" ]]; then
-      echo -e "  ${DIM}2) admin  管理者 (CUI のみ)                [追加済み ✓]${RESET}"
+      echo -e "  ${DIM}2) admin  administrator (CUI only)      [added]${RESET}"
     else
-      echo -e "  ${BOLD}2)${RESET} admin  管理者 (CUI のみ)                ${DIM}[デフォルト設定]${RESET}"
+      echo -e "  ${BOLD}2)${RESET} admin  administrator (CUI only)      ${DIM}[default config]${RESET}"
     fi
 
-    echo -e "  ${BOLD}3)${RESET} カスタムユーザーを追加"
+    echo -e "  ${BOLD}3)${RESET} Add custom user"
 
     if [[ ${#USER_MODULE_NAMES[@]} -gt 0 ]]; then
-      echo -e "  ${BOLD}0)${RESET} ユーザー設定を完了する"
+      echo -e "  ${BOLD}0)${RESET} Finish user configuration"
     fi
     echo
 
     local sel
-    read -rp "  選択 [0-3]: " sel
+    read -rp "  Select [0-3]: " sel
 
     case "$sel" in
       1)
         if [[ "$JADE_SELECTED" == "true" ]]; then
-          warn "jade はすでに追加されています。"
+          warn "jade is already added."
         else
           JADE_SELECTED=true
           HAS_GUI_USER=true
           USER_MODULE_NAMES+=("jade")
-          success "jade を追加しました。(既存の modules/users/jade/jade.nix を使用)"
+          success "Added jade. (uses existing modules/users/jade/jade.nix)"
         fi
         ;;
       2)
         if [[ "$ADMIN_SELECTED" == "true" ]]; then
-          warn "admin はすでに追加されています。"
+          warn "admin is already added."
         else
           ADMIN_SELECTED=true
           USER_MODULE_NAMES+=("admin")
-          success "admin を追加しました。(既存の modules/users/admin/nixos.nix を使用)"
+          success "Added admin. (uses existing modules/users/admin/nixos.nix)"
         fi
         ;;
       3)
@@ -665,23 +665,23 @@ phase2_user_config() {
         ;;
       0)
         if [[ ${#USER_MODULE_NAMES[@]} -eq 0 ]]; then
-          warn "少なくとも 1 人のユーザーを追加してください。"
+          warn "Please add at least one user."
           continue
         fi
         break
         ;;
       *)
-        warn "有効な選択肢を入力してください。"
+        warn "Please enter a valid choice."
         continue
         ;;
     esac
 
     echo
     local more
-    read -rp "  更にユーザーを追加しますか？ [y/N]: " more
+    read -rp "  Add another user? [y/N]: " more
     if [[ ! "$more" =~ ^[Yy]$ ]]; then
       if [[ ${#USER_MODULE_NAMES[@]} -eq 0 ]]; then
-        warn "少なくとも 1 人のユーザーを追加してください。"
+        warn "Please add at least one user."
       else
         break
       fi
@@ -690,50 +690,50 @@ phase2_user_config() {
   done
 
   echo
-  success "Phase 2 完了: ユーザー設定が確定しました。 (${USER_MODULE_NAMES[*]})"
+  success "Phase 2 complete: User configuration finalized. (${USER_MODULE_NAMES[*]})"
 }
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Nix ファイル生成: ホスト設定
-# ─────────────────────────────────────────────────────────────────────────────
+# -----------------------------------------------------------------------------
+# Nix file generation: host configuration
+# -----------------------------------------------------------------------------
 generate_host_config() {
   local target_dir="${MOUNT_ROOT}/etc/nixos/modules/hosts/${HOSTNAME}"
   mkdir -p "$target_dir"
 
-  # imports リスト構築
+  # Build imports list
   local imports_lines=""
   if [[ "$HAS_GUI_USER" == "true" ]]; then
-    # GUI ホスト: デスクトップ環境の全依存を展開
-    imports_lines="      system-base   # コアシステム (ブート / ネットワーク / Nix 設定 / GC)"
-    imports_lines+=$'\n'"      home-manager  # Home Manager 統合"
-    imports_lines+=$'\n'"      locale        # ロケール / フォント"
-    imports_lines+=$'\n'"      fcitx5        # 日本語入力"
+    # GUI host: expand all desktop dependencies
+    imports_lines="      system-base   # core system (boot / network / Nix settings / GC)"
+    imports_lines+=$'\n'"      home-manager  # Home Manager integration"
+    imports_lines+=$'\n'"      locale        # locale / fonts"
+    imports_lines+=$'\n'"      fcitx5        # Japanese input"
     imports_lines+=$'\n'"      audio         # PipeWire"
     imports_lines+=$'\n'"      desktop       # Niri / greetd / XDG Portal"
   else
-    # CUI ホスト: 最小構成
-    imports_lines="      system-base   # コアシステム (ブート / ネットワーク / Nix 設定 / GC)"
-    imports_lines+=$'\n'"      home-manager  # Home Manager 統合"
-    imports_lines+=$'\n'"      locale        # ロケール / フォント"
+    # CUI host: minimal setup
+    imports_lines="      system-base   # core system (boot / network / Nix settings / GC)"
+    imports_lines+=$'\n'"      home-manager  # Home Manager integration"
+    imports_lines+=$'\n'"      locale        # locale / fonts"
   fi
   if [[ "$STORAGE_ENABLED" == "true" ]]; then
     imports_lines+=$'\n'"      storage"
   fi
   if [[ "$NEEDS_PROGRAMMING_CLI" == "true" ]]; then
-    imports_lines+=$'\n'"      programming   # nix-ld (パッチなし ELF 実行)"
+    imports_lines+=$'\n'"      programming   # nix-ld (run unpatched ELF binaries)"
   fi
   for u in "${USER_MODULE_NAMES[@]}"; do
     imports_lines+=$'\n'"      ${u}"
   done
 
-  # SSH 値
+  # SSH value
   local ssh_val="$SSH_ENABLED"
 
   cat > "${target_dir}/configuration.nix" <<EOF
 { inputs, ... }:
 {
-  # ${HOSTNAME}: ${HOSTNAME} ホストの設定。
-  # setup.sh によって自動生成されました。
+  # ${HOSTNAME}: host configuration.
+  # Auto-generated by setup.sh.
   flake.modules.nixos.${HOSTNAME} = { lib, ... }: {
     imports = with inputs.self.modules.nixos; [
 ${imports_lines}
@@ -741,17 +741,17 @@ ${imports_lines}
 
     networking.hostName = "${HOSTNAME}";
 
-    # ハードウェア設定
+    # Hardware
     my.hardware.gpu = lib.mkDefault "${GPU_TYPE}";
     my.hardware.cpu = lib.mkDefault "${CPU_TYPE}";
 
-    # タイムゾーン
+    # Timezone
     time.timeZone = "${TIMEZONE}";
 
-    # キーボードレイアウト
+    # Keyboard layout
     console.keyMap = "${KEYBOARD}";
 
-    # ロケール
+    # Locale
     i18n.defaultLocale = "${LOCALE}";
 
     # SSH
@@ -760,7 +760,7 @@ ${imports_lines}
 }
 EOF
 
-  success "ホスト設定を生成しました: modules/hosts/${HOSTNAME}/configuration.nix"
+  success "Generated host config: modules/hosts/${HOSTNAME}/configuration.nix"
 }
 
 generate_host_flake_parts() {
@@ -770,27 +770,27 @@ generate_host_flake_parts() {
   cat > "${target_dir}/flake-parts.nix" <<EOF
 { inputs, ... }:
 {
-  # ${HOSTNAME} を nixosConfigurations に登録する。
-  # 使い方: sudo nixos-rebuild switch --flake .#${HOSTNAME}
+  # Register ${HOSTNAME} in nixosConfigurations.
+  # Usage: sudo nixos-rebuild switch --flake .#${HOSTNAME}
   flake.nixosConfigurations = inputs.self.lib.mkNixos "${ARCH}" "${HOSTNAME}";
 }
 EOF
 
-  success "ホスト flake-parts を生成しました: modules/hosts/${HOSTNAME}/flake-parts.nix"
+  success "Generated host flake-parts: modules/hosts/${HOSTNAME}/flake-parts.nix"
 }
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Nix ファイル生成: GUI カスタムユーザー
-# ─────────────────────────────────────────────────────────────────────────────
+# -----------------------------------------------------------------------------
+# Nix file generation: GUI custom user
+# -----------------------------------------------------------------------------
 generate_gui_user_nix() {
   local uname="$1"
   local udesc="$2"
-  local uprogs="$3"   # スペース区切りのプログラム名
+  local uprogs="$3"   # space-separated program names
 
   local target_dir="${MOUNT_ROOT}/etc/nixos/modules/users/${uname}"
   mkdir -p "$target_dir"
 
-  # imports リスト構築 (with ブロック用)
+  # Build imports list (for with block)
   local import_lines=""
   for p in $uprogs; do
     import_lines+=$'\n'"      ${p}"
@@ -802,8 +802,8 @@ let
   username = "${uname}";
 in
 {
-  # ${uname} (NixOS): ユーザー定義と Home Manager 統合。
-  # setup.sh によって自動生成されました。
+  # ${uname} (NixOS): user definition and Home Manager integration.
+  # Auto-generated by setup.sh.
   flake.modules.nixos."\${username}" = { pkgs, ... }: {
     users.users."\${username}" = {
       isNormalUser = true;
@@ -826,7 +826,7 @@ in
     };
   };
 
-  # ${uname} (Home Manager): デスクトップ環境設定。
+  # ${uname} (Home Manager): desktop environment configuration.
   flake.modules.homeManager."\${username}" = { pkgs, ... }: {
     imports = with inputs.self.modules.homeManager; [
 ${import_lines}
@@ -841,12 +841,12 @@ ${import_lines}
 }
 EOF
 
-  success "GUI ユーザー設定を生成しました: modules/users/${uname}/${uname}.nix"
+  success "Generated GUI user config: modules/users/${uname}/${uname}.nix"
 }
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Nix ファイル生成: CUI カスタムユーザー (programming-cli あり)
-# ─────────────────────────────────────────────────────────────────────────────
+# -----------------------------------------------------------------------------
+# Nix file generation: CUI custom user (with Home Manager / programming)
+# -----------------------------------------------------------------------------
 generate_cui_user_with_hm_nix() {
   local uname="$1"
   local udesc="$2"
@@ -860,8 +860,8 @@ let
   username = "${uname}";
 in
 {
-  # ${uname} (NixOS): CUI ユーザーの定義。
-  # setup.sh によって自動生成されました。
+  # ${uname} (NixOS): CUI user definition.
+  # Auto-generated by setup.sh.
   flake.modules.nixos."\${username}" = { pkgs, ... }: {
     users.users."\${username}" = {
       isNormalUser = true;
@@ -880,7 +880,7 @@ in
     };
   };
 
-  # ${uname} (Home Manager): CLI 開発環境設定。
+  # ${uname} (Home Manager): CLI development environment.
   flake.modules.homeManager."\${username}" = { ... }: {
     imports = [
       inputs.self.modules.homeManager."programming"
@@ -895,12 +895,12 @@ in
 }
 EOF
 
-  success "CUI ユーザー設定を生成しました: modules/users/${uname}/nixos.nix"
+  success "Generated CUI user config: modules/users/${uname}/nixos.nix"
 }
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Nix ファイル生成: CUI カスタムユーザー (プログラムなし)
-# ─────────────────────────────────────────────────────────────────────────────
+# -----------------------------------------------------------------------------
+# Nix file generation: CUI custom user (no Home Manager)
+# -----------------------------------------------------------------------------
 generate_cui_user_minimal_nix() {
   local uname="$1"
   local udesc="$2"
@@ -914,8 +914,8 @@ let
   username = "${uname}";
 in
 {
-  # ${uname} (NixOS): CUI ユーザーの定義 (Home Manager なし)。
-  # setup.sh によって自動生成されました。
+  # ${uname} (NixOS): CUI user definition (no Home Manager).
+  # Auto-generated by setup.sh.
   flake.modules.nixos."\${username}" = { pkgs, ... }: {
     users.users."\${username}" = {
       isNormalUser = true;
@@ -932,95 +932,95 @@ in
 }
 EOF
 
-  success "CUI ユーザー設定を生成しました: modules/users/${uname}/nixos.nix"
+  success "Generated CUI user config: modules/users/${uname}/nixos.nix"
 }
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Phase 3: インストール
-# ─────────────────────────────────────────────────────────────────────────────
+# -----------------------------------------------------------------------------
+# Phase 3: Installation
+# -----------------------------------------------------------------------------
 phase3_install() {
   echo
-  banner "ステップ 3/3: インストール"
+  banner "Step 3/3: Installation"
 
-  # ── 設定サマリー ──────────────────────────────────────────────────────────
-  step "設定サマリー"
-  echo -e "  ホスト名             : ${BOLD}${HOSTNAME}${RESET}"
-  echo -e "  インストール先       : ${BOLD}${DEVICE}${RESET}"
-  echo -e "  EFI 終了位置         : ${BOOT_END}"
-  echo -e "  ルート終了位置       : ${ROOT_END}"
+  # -- Configuration summary -------------------------------------------------
+  step "Configuration Summary"
+  echo -e "  Hostname             : ${BOLD}${HOSTNAME}${RESET}"
+  echo -e "  Install target       : ${BOLD}${DEVICE}${RESET}"
+  echo -e "  EFI end              : ${BOOT_END}"
+  echo -e "  Root end             : ${ROOT_END}"
   echo -e "  GPU                  : ${GPU_TYPE}"
   echo -e "  CPU                  : ${CPU_TYPE}"
-  echo -e "  アーキテクチャ       : ${ARCH}"
-  echo -e "  キーボード           : ${KEYBOARD}"
-  echo -e "  ロケール             : ${LOCALE}"
-  echo -e "  タイムゾーン         : ${TIMEZONE}"
+  echo -e "  Architecture         : ${ARCH}"
+  echo -e "  Keyboard             : ${KEYBOARD}"
+  echo -e "  Locale               : ${LOCALE}"
+  echo -e "  Timezone             : ${TIMEZONE}"
   echo -e "  SSH                  : ${SSH_ENABLED}"
   echo -e "  nix-auto-storage     : ${STORAGE_ENABLED}"
-  echo -e "  ユーザー             : ${BOLD}${USER_MODULE_NAMES[*]}${RESET}"
+  echo -e "  Users                : ${BOLD}${USER_MODULE_NAMES[*]}${RESET}"
   echo
-  echo -e "  ${RED}${BOLD}警告: ${DEVICE} のすべてのデータが消去されます。${RESET}"
+  echo -e "  ${RED}${BOLD}WARNING: ALL DATA on ${DEVICE} will be erased.${RESET}"
   echo
 
   local confirm
-  read -rp "  インストールを開始しますか？ [yes/N]: " confirm
+  read -rp "  Type 'yes' to start installation [yes/N]: " confirm
   if [[ "$confirm" != "yes" ]]; then
-    info "インストールを中断しました。"
+    info "Installation cancelled."
     exit 0
   fi
 
-  # ── パーティション作成 ────────────────────────────────────────────────────
-  step "パーティション作成"
+  # -- Partitioning ----------------------------------------------------------
+  step "Creating Partitions"
   parted -s "$DEVICE" mklabel gpt
   parted -s "$DEVICE" mkpart ESP fat32 1MiB "$BOOT_END"
   parted -s "$DEVICE" set 1 esp on
   parted -s "$DEVICE" mkpart nixos ext4 "$BOOT_END" "$ROOT_END"
   parted -s "$DEVICE" mkpart swap linux-swap "$ROOT_END" 100%
-  success "GPT パーティションテーブルを作成しました"
+  success "GPT partition table created"
 
-  step "ファイルシステム作成"
+  step "Formatting Filesystems"
   mkfs.fat -F 32 -n boot "$PART_BOOT"
   mkfs.ext4 -L nixos -F "$PART_ROOT"
   mkswap -L swap "$PART_SWAP"
-  success "ファイルシステムを作成しました"
+  success "Filesystems formatted"
 
-  # ── マウント ─────────────────────────────────────────────────────────────
-  step "マウント"
+  # -- Mounting --------------------------------------------------------------
+  step "Mounting"
   mount /dev/disk/by-label/nixos "$MOUNT_ROOT"
   mkdir -p "${MOUNT_ROOT}/boot"
   mount /dev/disk/by-label/boot "${MOUNT_ROOT}/boot"
   swapon /dev/disk/by-label/swap
-  success "マウント完了 (root=${MOUNT_ROOT})"
+  success "Mounted (root=${MOUNT_ROOT})"
 
-  # ── リポジトリをセットアップ ──────────────────────────────────────────────
-  step "リポジトリを配置"
+  # -- Clone repository ------------------------------------------------------
+  step "Cloning Repository"
   mkdir -p "${MOUNT_ROOT}/etc/nixos"
   cd "${MOUNT_ROOT}/etc/nixos"
   git init
   git remote add origin "$REPO_URL"
   git fetch origin
   git checkout -t origin/main
-  success "リポジトリを配置しました (${MOUNT_ROOT}/etc/nixos)"
+  success "Repository cloned to ${MOUNT_ROOT}/etc/nixos"
 
-  # ── ハードウェア設定を生成 ───────────────────────────────────────────────
-  step "hardware-configuration.nix を生成"
+  # -- Generate hardware configuration ---------------------------------------
+  step "Generating hardware-configuration.nix"
   mkdir -p "${MOUNT_ROOT}/etc/nixos/nixos/${HOSTNAME}"
   nixos-generate-config \
     --root "$MOUNT_ROOT" \
     --dir "${MOUNT_ROOT}/etc/nixos/nixos/${HOSTNAME}"
-  # nixos-generate-config が生成する configuration.nix は使わないので削除
+  # Remove configuration.nix generated by nixos-generate-config (not used with flakes)
   rm -f "${MOUNT_ROOT}/etc/nixos/nixos/${HOSTNAME}/configuration.nix"
-  success "hardware-configuration.nix を生成しました: nixos/${HOSTNAME}/"
+  success "Generated: nixos/${HOSTNAME}/hardware-configuration.nix"
 
-  # ── ホスト設定ファイルを生成 ─────────────────────────────────────────────
-  step "ホスト設定ファイルを生成"
+  # -- Generate host configuration -------------------------------------------
+  step "Generating Host Configuration"
   generate_host_config
   generate_host_flake_parts
 
-  # ── カスタムユーザーファイルを生成 ──────────────────────────────────────
+  # -- Generate custom user configs ------------------------------------------
   if [[ ${#CUSTOM_USERS[@]} -gt 0 ]]; then
-    step "カスタムユーザー設定ファイルを生成"
+    step "Generating Custom User Configurations"
     for entry in "${CUSTOM_USERS[@]}"; do
-      # "username:type:description:prog1 prog2 ..." を分解
+      # Parse "username:type:description:prog1 prog2 ..."
       local uname utype udesc uprogs_str
       uname="${entry%%:*}"
       local rest="${entry#*:}"
@@ -1032,7 +1032,7 @@ phase3_install() {
       if [[ "$utype" == "gui" ]]; then
         generate_gui_user_nix "$uname" "$udesc" "$uprogs_str"
       else
-        # programming が含まれているか確認
+        # Check if programming is included
         if echo "$uprogs_str" | grep -qw "programming"; then
           generate_cui_user_with_hm_nix "$uname" "$udesc"
         else
@@ -1042,45 +1042,45 @@ phase3_install() {
     done
   fi
 
-  # ── NetworkManager 接続プロファイルを引き継ぎ ────────────────────────────
+  # -- Copy NetworkManager profiles ------------------------------------------
   local NM_SRC="/etc/NetworkManager/system-connections"
   local NM_DST="${MOUNT_ROOT}/etc/NetworkManager/system-connections"
   if [[ -d "$NM_SRC" ]] && [[ -n "$(ls -A "$NM_SRC" 2>/dev/null)" ]]; then
-    step "NetworkManager 接続プロファイルを引き継ぎ"
+    step "Copying NetworkManager Profiles"
     mkdir -p "$NM_DST"
     cp -r "${NM_SRC}/." "$NM_DST/"
     chmod 700 "$NM_DST"
     chmod 600 "$NM_DST"/* 2>/dev/null || true
-    success "接続プロファイルをコピーしました"
+    success "NetworkManager profiles copied"
   else
-    warn "NetworkManager 接続プロファイルなし。初回起動後に nmtui で設定してください。"
+    warn "No NetworkManager profiles found. Configure network with nmtui after first boot."
   fi
 
-  # ── flake 用に git add ───────────────────────────────────────────────────
-  step "flake 用に git add ."
+  # -- git add for flake tracking --------------------------------------------
+  step "Tracking files with git add ."
   cd "${MOUNT_ROOT}/etc/nixos"
   git add .
-  success "追跡完了"
+  success "All files tracked"
 
-  # ── nixos-install ────────────────────────────────────────────────────────
+  # -- nixos-install ---------------------------------------------------------
   echo
-  info "nixos-install を開始します: .#${HOSTNAME}"
+  info "Starting nixos-install: .#${HOSTNAME}"
   nixos-install --flake "${MOUNT_ROOT}/etc/nixos#${HOSTNAME}"
 
-  # ── 完了 ─────────────────────────────────────────────────────────────────
+  # -- Done ------------------------------------------------------------------
   echo
   echo -e "${GREEN}${BOLD}"
-  echo "══════════════════════════════════════════════════════════"
-  echo "  インストール完了！"
-  echo "══════════════════════════════════════════════════════════"
+  echo "=========================================================="
+  echo "  Installation complete!"
+  echo "=========================================================="
   echo -e "${RESET}"
-  echo -e "  次のコマンドで再起動してください: ${BOLD}reboot${RESET}"
+  echo -e "  Reboot with: ${BOLD}reboot${RESET}"
   echo
 }
 
-# ─────────────────────────────────────────────────────────────────────────────
-# メイン
-# ─────────────────────────────────────────────────────────────────────────────
+# -----------------------------------------------------------------------------
+# Main
+# -----------------------------------------------------------------------------
 main() {
   phase1_pc_config
   phase2_user_config
