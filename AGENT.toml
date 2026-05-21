@@ -1,0 +1,124 @@
+[hardware]
+# hardware=cpu+gpu+storage
+
+[hardware.cpu]
+# hardware.cpu.amd.updateMicrocode = true
+amd="amd-ucode"
+# hardware.cpu.intel.updateMicrocode = true
+intel="intel-ucode"
+# no microcode required
+arm=""
+
+[hardware.gpu]
+# services.xserver.videoDrivers=["nvidia"], hardware.nvidia.{modesetting.enable,nvidiaSettings}=true, boot.kernelParams=["nvidia-drm.modeset=1"], hardware.graphics.{enable,enable32Bit}=true
+nvidia="nvtopPackages.nvidia, vulkan-tools, vulkan-loader, vulkan-validation-layers"
+# hardware.graphics.{enable,enable32Bit}=true, programs.{gamemode,steam}.enable=true
+amd="mesa"
+# hardware.graphics.enable=true, hardware video decoding via intel-media-driver
+intel="intel-media-driver, intel-compute-runtime, intel-gpu-tools"
+
+[hardware.storage]
+# systemd.services.nix-auto-storage auto-mounts non-boot drives and places /nix on them; btrfs-progs applied automatically
+storage=1
+
+[software]
+# software=base+users
+
+[software.base]
+# security.rtkit.enable=true, services.pipewire.{enable,alsa,pulse,jack,wireplumber}=true, services.pipewire.alsa.support32Bit=true
+audio="pipewire, wireplumber"
+# console.keyMap="jp106", i18n.inputMethod.enable=true, i18n.inputMethod.type="fcitx5", i18n.inputMethod.fcitx5.addons=[fcitx5-mozc,fcitx5-gtk,fcitx5-configtool]
+keyboard="fcitx5-mozc, fcitx5-gtk, fcitx5-configtool"
+# i18n.defaultLocale="ja_JP.UTF-8", i18n.extraLocaleSettings LC_*=ja_JP.UTF-8, fonts.packages=[noto-fonts, noto-fonts-cjk-sans, noto-fonts-cjk-serif, noto-fonts-emoji, source-han-sans, source-han-serif]
+locale="noto-fonts, noto-fonts-cjk-sans, noto-fonts-cjk-serif, noto-fonts-emoji, source-han-sans, source-han-serif"
+
+[software.users]
+# users=[admin,jade, other...]
+# users are defined as sections under software.users with their specific software settings.
+
+[software.users.admin]
+# cui_user
+# users.users.admin.{isNormalUser=true, shell=zsh, extraGroups=["wheel","networkmanager","audio","video","input","seat"]}, programs.zsh.enable=true
+
+[software.users.jade]
+# gui_user
+# programs.niri.enable=true, services.{greetd,seatd,dbus}.enable=true, xdg.portal.enable=true, programs.dconf.enable=true, security.polkit.enable=true
+desktop="ironbar, wl-clipboard, wayshot, wlsunset, swww, tofi, wezterm, pwvucontrol, pamixer"
+# home.packages=[chromium], home.sessionVariables.NIXOS_OZONE_WL=1
+browser="chromium"
+# home.packages=[spotify, mpv, oculante, playerctl]
+media="spotify, mpv, oculante, playerctl"
+# home.packages=[discord]
+sns="discord"
+# home.packages=[lutris, wineWowPackages.stable, winetricks], programs.steam.{enable,remotePlay.openFirewall}=true, programs.gamemode.enable=true, hardware.graphics.enable32Bit=true
+gaming="lutris, wineWowPackages.stable, winetricks"
+# programs.nix-ld.enable=true, home.packages=[zed-editor(unstable), rustc, clang, mold, python3, git, nil, devenv, nix-index, nixfmt-rfc-style, xh, jaq, just, pkg-config], programs.{zsh,nushell,direnv,direnv.nix-direnv}.enable=true
+programming="zed-editor, rustc, clang, mold, python3, git, nil, devenv, nix-index, nixfmt-rfc-style, xh, jaq, just, pkg-config"
+# home.packages=[kicad]
+electronics="kicad"
+# home.packages=[freecad-wayland, meshlab]
+mechanical="freecad-wayland, meshlab"
+
+[software.users.gaming]
+# gaming_user
+# programs.niri.enable=true, services.{greetd,seatd,dbus}.enable=true, xdg.portal.enable=true, security.polkit.enable=true
+desktop="ironbar, wl-clipboard, wayshot, wlsunset, swww, tofi, wezterm, pwvucontrol, pamixer"
+# home.packages=[chromium], home.sessionVariables.NIXOS_OZONE_WL=1
+browser="chromium"
+# home.packages=[spotify, mpv, oculante, playerctl]
+media="spotify, mpv, oculante, playerctl"
+# home.packages=[discord]
+sns="discord"
+# home.packages=[lutris, wineWowPackages.stable, winetricks], programs.steam.{enable,remotePlay.openFirewall}=true, programs.gamemode.enable=true, hardware.graphics.enable32Bit=true
+gaming="lutris, wineWowPackages.stable, winetricks"
+
+[software.users.developer]
+# developer_user
+# programs.niri.enable=true, services.{greetd,seatd,dbus}.enable=true, xdg.portal.enable=true, security.polkit.enable=true
+desktop="ironbar, wl-clipboard, wayshot, wlsunset, swww, tofi, wezterm, pwvucontrol, pamixer"
+# home.packages=[chromium], home.sessionVariables.NIXOS_OZONE_WL=1
+browser="chromium"
+# programs.nix-ld.enable=true, home.packages=[zed-editor(unstable), rustc, clang, mold, python3, git, nil, devenv, nix-index, nixfmt-rfc-style, xh, jaq, just, pkg-config], programs.{zsh,nushell,direnv,direnv.nix-direnv}.enable=true
+programming="zed-editor, rustc, clang, mold, python3, git, nil, devenv, nix-index, nixfmt-rfc-style, xh, jaq, just, pkg-config"
+# home.packages=[kicad]
+electronics="kicad"
+# home.packages=[freecad-wayland, meshlab]
+mechanical="freecad-wayland, meshlab"
+
+# [software.users.other]
+# other user settings...
+
+[pc1]
+# pc1 is a desktop with AMD CPU, AMD GPU, 1 storage, and has both admin and jade users with base software and jade's specific software settings.
+[pc1.hardware]
+cpu="amd"
+gpu="amd"
+storage=1
+
+[pc1.software]
+base="base"
+users=["admin", "jade"]
+
+[pc2]
+# pc2 is a desktop with AMD CPU, NVIDIA GPU, 2 storage, and has both admin and jade users with base software and jade's specific software settings.
+[pc2.hardware]
+cpu="amd"
+gpu="nvidia"
+storage=2
+
+[pc2.software]
+base="base"
+users=["admin", "jade"]
+
+[pc3]
+# pc3 is a virtual machine with Intel CPU, Intel GPU, 1 storage, and has only admin user with base software settings.
+[pc3.hardware]
+cpu="intel"
+gpu="intel"
+storage=1
+
+[pc3.software]
+base="base"
+users=["admin"]
+
+
