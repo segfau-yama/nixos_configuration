@@ -992,6 +992,11 @@ phase3_install() {
   mkswap -L swap "$PART_SWAP"
   success "Filesystems formatted"
 
+  # Wait for udev to create /dev/disk/by-label/* symlinks.
+  # Without this, mount by label fails immediately after mkfs.
+  udevadm trigger --action=add 2>/dev/null || true
+  udevadm settle
+
   # -- Mounting --------------------------------------------------------------
   step "Mounting"
   mount /dev/disk/by-label/nixos "$MOUNT_ROOT"
