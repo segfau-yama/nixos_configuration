@@ -3,6 +3,9 @@
   # system-base: 全ホスト共通の基盤 NixOS 設定。
   # unstable overlay, nix 設定, GC, boot, networking, timezone, stateVersion を含む。
   flake.modules.nixos.system-base = { pkgs, ... }: {
+    imports = with inputs.self.modules.nixos; [
+      hardware # my.hardware.gpu / cpu オプションを提供するハードウェア抽象化モジュール
+    ];
     nixpkgs.overlays = [
       # pkgs.unstable でアンスタブル版パッケージを参照できるようにする。
       (final: _prev: {

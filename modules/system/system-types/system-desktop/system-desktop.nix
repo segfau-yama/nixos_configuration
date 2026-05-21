@@ -10,7 +10,7 @@
   #   locale          → 日本語ロケール / フォント
   #   fcitx5          → 日本語入力 (fcitx5-mozc)
   #   audio           → PipeWire + ALSA/JACK/PulseAudio 互換
-  #   niri            → Wayland コンポジター + greetd + portal + tofi
+  #   desktop         → Wayland コンポジター + greetd + portal + tofi (niri/ironbar/notifications 統合)
   flake.modules.nixos.system-desktop = {
     imports = with inputs.self.modules.nixos; [
       system-base
@@ -18,7 +18,7 @@
       locale
       fcitx5
       audio
-      niri
+      desktop
     ];
   };
 }

@@ -1,6 +1,11 @@
 { ... }:
 {
-  # programming/home (Home Manager): プログラミング環境に必要な全 HM 設定を一箇所に集約する。
+  # programming (NixOS): nix-ld でパッチされていない ELF バイナリを実行可能にする。
+  flake.modules.nixos.programming = { ... }: {
+    programs.nix-ld.enable = true;
+  };
+
+  # programming (Home Manager): プログラミング環境に必要な全 HM 設定を一箇所に集約する。
   #
   # 含まれる設定:
   #   - editor  : Zed エディター (pkgs.unstable)
@@ -8,16 +13,10 @@
   #   - nix     : nix-index / devenv / nil / nixfmt
   #   - shell   : direnv / nushell
   #   - tools   : git / xh / jaq / just / pkg-config
-  #
-  # ※ NixOS 側 (nix-ld) は programming/nixos.nix で管理する (Multi Context Aspect)。
   flake.modules.homeManager.programming = { pkgs, ... }: {
 
-    # ── Editor ───────────────────────────────────────────────────────────────
-    # Zed は更新頻度が高いため unstable を使用する。
-    # system-base の overlay で pkgs.unstable が利用可能になっている。
-
     # ── Shell: Zsh (ログインシェル) ──────────────────────────────────────────
-    # jade/nixos.nix で users.users.jade.shell = pkgs.zsh に設定済み。
+    # jade/jade.nix で users.users.jade.shell = pkgs.zsh に設定済み。
     # HM で管理することで補完・提案・ハイライトを宣言的に設定する。
     programs.zsh = {
       enable                     = true;
