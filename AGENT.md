@@ -235,15 +235,15 @@ host 側には「どの feature を有効化するか」だけを書き、詳細
 以下を順番に出力すること。
 
 1. 全体ディレクトリ構造
-2. flake.nix
-3. configuration.nix
-4. hosts/default/default.nix
-5. 各 feature のコード
-6. Home Manager 設定
-7. なぜその Dendritic Pattern にしたか
-8. NVIDIA + Niri の注意点
-9. Wayland 特有の注意点
-10. rebuild 手順
+1. flake.nix
+1. configuration.nix
+1. hosts/default/default.nix
+1. 各 feature のコード
+1. Home Manager 設定
+1. なぜその Dendritic Pattern にしたか
+1. NVIDIA + Niri の注意点
+1. Wayland 特有の注意点
+1. rebuild 手順
 
 # コード品質ルール
 

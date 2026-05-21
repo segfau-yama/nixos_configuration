@@ -64,7 +64,7 @@
 
           uuid="$(blkid -s UUID -o value "$dev" 2>/dev/null || true)"
           label="$(blkid -s LABEL -o value "$dev" 2>/dev/null || true)"
-          safe_name="${label:-$uuid}"
+          safe_name="''${label:-$uuid}"
           safe_name="$(echo "$safe_name" | sed 's/[^a-zA-Z0-9._-]/_/g')"
           if [[ -z "$safe_name" ]]; then
             safe_name="$(basename "$dev")"

@@ -30,14 +30,18 @@ in
   # jade (Home Manager): デスクトップ全機能を組み合わせたメインユーザー設定。
   flake.modules.homeManager."${username}" = { pkgs, ... }: {
     imports = with inputs.self.modules.homeManager; [
-      desktop       # デスクトップ環境 (Niri/IronBar/mako/swww 統合)
-      programming   # プログラミングツール群
-      gaming        # Lutris + Wine
-      media         # Spotify + mpv
-      browser       # Chromium
-      sns           # Discord 他 SNS クライアント
-      electronics   # KiCad + ngspice + gerbv
-      mechanical    # FreeCAD + PrusaSlicer + MeshLab + OpenSCAD
+      desktop     # デスクトップ環境 (Niri/IronBar/mako/swww 統合)
+      gaming      # Lutris + Wine
+      media       # Spotify + mpv
+      browser     # Chromium
+      sns         # Discord 他 SNS クライアント
+      kicad       # KiCad 基板設計
+      freecad     # FreeCAD + MeshLab 3D モデリング
+      zed         # Zed エディター (GUI)
+      programming # シェル設定 (Zsh / Nushell / Direnv)
+      lang        # 言語ツールチェーン (Rust / C++ / Python)
+      nix-tools   # Nix エコシステム (nix-index / devenv / nil)
+      cli-tools   # 汎用 CLI ツール (git / xh / jaq / just)
     ];
 
     home.username    = "${username}";
