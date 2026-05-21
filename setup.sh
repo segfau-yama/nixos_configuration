@@ -122,9 +122,18 @@ detect_hardware() {
     GPU_BRAND=$(echo "$gpu_info" | grep -i "Intel" | head -1 \
       | sed -E 's/.*\[([^]]+)\].*/\1/' \
       | grep -v '^$' || echo "Intel GPU")
+  elif [[ -n "$gpu_info" ]]; then
+    # Generic VGA / VM graphics (VGA compatible controller, Virtio GPU,
+    # VMware SVGA, VirtualBox Graphics, QXL, Bochs VBE, etc.)
+    # Keep GPU_TYPE=none (no proprietary driver needed) but show the real name.
+    GPU_TYPE="none"
+    GPU_BRAND=$(echo "$gpu_info" | head -1 \
+      | sed -E 's/^[0-9a-f:.]+[[:space:]]+(VGA compatible controller|3D controller|Display controller):[[:space:]]*//' \
+      | xargs)
+    [[ -z "$GPU_BRAND" ]] && GPU_BRAND="Generic VGA / VM GPU"
   else
     GPU_TYPE="none"
-    GPU_BRAND="not detected (VM / no GPU)"
+    GPU_BRAND="not detected (no GPU / lspci unavailable)"
   fi
 }
 
