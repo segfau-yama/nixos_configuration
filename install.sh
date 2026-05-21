@@ -146,6 +146,22 @@ info "ステップ 5/6: hardware-configuration.nix を生成"
 nixos-generate-config --root "$MOUNT_ROOT"
 success "hardware-configuration.nix 生成完了"
 
+# ── NetworkManager 接続プロファイルを引き継ぎ ─────────────────
+# インストーラ上で nmtui などで設定した接続を /mnt 側にコピーする。
+# これにより初回起動時に NetworkManager-wait-online が成功しやすくなる。
+NM_SRC="/etc/NetworkManager/system-connections"
+NM_DST="${MOUNT_ROOT}/etc/NetworkManager/system-connections"
+if [[ -d "$NM_SRC" ]] && [[ -n "$(ls -A "$NM_SRC" 2>/dev/null)" ]]; then
+  info "NetworkManager 接続プロファイルを引き継ぎ"
+  mkdir -p "$NM_DST"
+  cp -r "${NM_SRC}/." "$NM_DST/"
+  chmod 700 "$NM_DST"
+  chmod 600 "$NM_DST"/*  2>/dev/null || true
+  success "接続プロファイルをコピーしました (${NM_SRC} → ${NM_DST})"
+else
+  warn "接続プロファイルなし。初回起動後に nmtui で設定してください。"
+fi
+
 # ── ステップ 6: flake 用に Git 追跡 ──────────────────────────
 info "ステップ 6/6: flake 用に git add ."
 cd "${MOUNT_ROOT}/etc/nixos"
