@@ -68,6 +68,7 @@ GPU_BRAND="not detected"
 CPU_TYPE="amd"
 CPU_BRAND="unknown"
 ARCH="x86_64-linux"
+BOOT_TYPE="systemd-boot"  # "systemd-boot" | "grub"
 
 # Phase 2: User configuration
 declare -a USER_MODULE_NAMES=()   # module names to list in host config imports
@@ -143,6 +144,13 @@ detect_hardware() {
     GPU_TYPE="none"
     GPU_BRAND="not detected (no GPU / lspci unavailable)"
   fi
+
+  # Boot type detection
+  if [[ -d /sys/firmware/efi/efivars ]]; then
+    BOOT_TYPE="systemd-boot"
+  else
+    BOOT_TYPE="grub"
+  fi
 }
 
 # -----------------------------------------------------------------------------
@@ -162,6 +170,7 @@ phase1_pc_config() {
   echo -e "  CPU    : ${BOLD}${CPU_BRAND}${RESET} (${CPU_TYPE})"
   echo -e "  GPU    : ${BOLD}${GPU_BRAND}${RESET} (${GPU_TYPE})"
   echo -e "  Memory : ${BOLD}${mem_gb} GB${RESET}"
+  echo -e "  Boot   : ${BOLD}${BOOT_TYPE}${RESET}"
   echo
 
   step "Storage Devices"
@@ -216,11 +225,17 @@ phase1_pc_config() {
   echo
   step "Partition Configuration"
   local input
-  read -rp "  EFI partition end (default: ${BOOT_END}): " input
-  [[ -n "$input" ]] && BOOT_END="$input"
-  read -rp "  Root partition end (default: ${ROOT_END}): " input
-  [[ -n "$input" ]] && ROOT_END="$input"
-  echo -e "  EFI: ${CYAN}${BOOT_END}${RESET}   Root: ${CYAN}${ROOT_END}${RESET}   Swap: rest"
+  if [[ "$BOOT_TYPE" == "systemd-boot" ]]; then
+    read -rp "  EFI partition end (default: ${BOOT_END}): " input
+    [[ -n "$input" ]] && BOOT_END="$input"
+    read -rp "  Root partition end (default: ${ROOT_END}): " input
+    [[ -n "$input" ]] && ROOT_END="$input"
+    echo -e "  EFI: ${CYAN}${BOOT_END}${RESET}   Root: ${CYAN}${ROOT_END}${RESET}   Swap: rest"
+  else
+    read -rp "  Root partition end (default: ${ROOT_END}): " input
+    [[ -n "$input" ]] && ROOT_END="$input"
+    echo -e "  ${DIM}BIOS mode: biosboot (2MiB fixed)${RESET}   Root: ${CYAN}${ROOT_END}${RESET}   Swap: rest"
+  fi
 
   # -- Hostname --------------------------------------------------------------
   echo
@@ -746,6 +761,19 @@ generate_host_config() {
   # SSH value
   local ssh_val="$SSH_ENABLED"
 
+  # Boot loader config block
+  local boot_loader_nix
+  if [[ "$BOOT_TYPE" == "systemd-boot" ]]; then
+    boot_loader_nix="    boot.loader.systemd-boot.enable = true;
+    boot.loader.efi.canTouchEfiVariables = true;"
+  else
+    boot_loader_nix="    boot.loader.grub = {
+      enable  = true;
+      device  = \"${DEVICE}\";
+      efiSupport = false;
+    };"
+  fi
+
   cat > "${target_dir}/configuration.nix" <<EOF
 { inputs, ... }:
 {
@@ -773,6 +801,9 @@ ${imports_lines}
 
     # SSH
     services.openssh.enable = ${ssh_val};
+
+    # Boot loader
+${boot_loader_nix}
   };
 }
 EOF
@@ -965,6 +996,7 @@ phase3_install() {
   echo -e "  Install target       : ${BOLD}${DEVICE}${RESET}"
   echo -e "  EFI end              : ${BOOT_END}"
   echo -e "  Root end             : ${ROOT_END}"
+  echo -e "  Boot loader          : ${BOOT_TYPE}"
   echo -e "  GPU                  : ${GPU_TYPE}"
   echo -e "  CPU                  : ${CPU_TYPE}"
   echo -e "  Architecture         : ${ARCH}"
@@ -988,14 +1020,25 @@ phase3_install() {
   # -- Partitioning ----------------------------------------------------------
   step "Creating Partitions"
   parted -s "$DEVICE" mklabel gpt
-  parted -s "$DEVICE" mkpart ESP fat32 1MiB "$BOOT_END"
-  parted -s "$DEVICE" set 1 esp on
-  parted -s "$DEVICE" mkpart nixos ext4 "$BOOT_END" "$ROOT_END"
-  parted -s "$DEVICE" mkpart swap linux-swap "$ROOT_END" 100%
+  if [[ "$BOOT_TYPE" == "systemd-boot" ]]; then
+    # EFI: パーティション1 = ESP/FAT32、パーティション2 = Root、パーティション3 = Swap
+    parted -s "$DEVICE" mkpart ESP fat32 1MiB "$BOOT_END"
+    parted -s "$DEVICE" set 1 esp on
+    parted -s "$DEVICE" mkpart nixos ext4 "$BOOT_END" "$ROOT_END"
+    parted -s "$DEVICE" mkpart swap linux-swap "$ROOT_END" 100%
+  else
+    # BIOS/GPT: パーティション1 = BIOS boot (1MB)、パーティション2 = Root、パーティション3 = Swap
+    parted -s "$DEVICE" mkpart grub 1MiB 2MiB
+    parted -s "$DEVICE" set 1 bios_grub on
+    parted -s "$DEVICE" mkpart nixos ext4 2MiB "$ROOT_END"
+    parted -s "$DEVICE" mkpart swap linux-swap "$ROOT_END" 100%
+  fi
   success "GPT partition table created"
 
   step "Formatting Filesystems"
-  mkfs.fat -F 32 -n boot "$PART_BOOT"
+  if [[ "$BOOT_TYPE" == "systemd-boot" ]]; then
+    mkfs.fat -F 32 -n boot "$PART_BOOT"
+  fi
   mkfs.ext4 -L nixos -F "$PART_ROOT"
   mkswap -L swap "$PART_SWAP"
   success "Filesystems formatted"
@@ -1008,8 +1051,10 @@ phase3_install() {
   # -- Mounting --------------------------------------------------------------
   step "Mounting"
   mount /dev/disk/by-label/nixos "$MOUNT_ROOT"
-  mkdir -p "${MOUNT_ROOT}/boot"
-  mount /dev/disk/by-label/boot "${MOUNT_ROOT}/boot"
+  if [[ "$BOOT_TYPE" == "systemd-boot" ]]; then
+    mkdir -p "${MOUNT_ROOT}/boot"
+    mount /dev/disk/by-label/boot "${MOUNT_ROOT}/boot"
+  fi
   swapon /dev/disk/by-label/swap
   success "Mounted (root=${MOUNT_ROOT})"
 

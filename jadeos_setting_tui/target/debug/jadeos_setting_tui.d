@@ -1,0 +1,1 @@
+/workspaces/nixos_configuration/jadeos_setting_tui/target/debug/jadeos_setting_tui: /workspaces/nixos_configuration/jadeos_setting_tui/src/app.rs /workspaces/nixos_configuration/jadeos_setting_tui/src/config.rs /workspaces/nixos_configuration/jadeos_setting_tui/src/main.rs /workspaces/nixos_configuration/jadeos_setting_tui/src/ui.rs

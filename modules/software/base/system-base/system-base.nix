@@ -73,8 +73,8 @@
       '')
     ];
 
-    boot.loader.systemd-boot.enable = true;
-    boot.loader.efi.canTouchEfiVariables = true;
+    # ブートローダーはホスト設定 (modules/hosts/<hostname>/configuration.nix) で定義する。
+    # setup.sh が EFI/BIOS を検出して systemd-boot または GRUB を自動設定する。
 
     networking.networkmanager.enable = true;
     services.resolved = {
