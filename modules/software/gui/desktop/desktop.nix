@@ -8,7 +8,28 @@
   #   - xdg-desktop-portal (gtk + gnome バックエンド)
   #   - Wayland 基本ツール + ironbar (シェル UI)
   # ユーザーアプリ (wezterm / spacedrive 等) は homeManager.jade で管理する。
-  flake.modules.nixos.desktop = { pkgs, ... }: {
+  flake.modules.nixos.desktop = { pkgs, ... }:
+  let
+    niriSession = pkgs.writeShellScript "niri-session-explicit-env" ''
+      if ${pkgs.systemd}/bin/systemctl --user -q is-active niri.service; then
+        echo "A niri session is already running."
+        exit 1
+      fi
+
+      ${pkgs.systemd}/bin/systemctl --user reset-failed
+
+      session_env_vars="DISPLAY WAYLAND_DISPLAY XDG_SESSION_TYPE XDG_SESSION_DESKTOP XDG_CURRENT_DESKTOP NIRI_SOCKET XCURSOR_SIZE XCURSOR_THEME PATH SSH_AUTH_SOCK"
+      ${pkgs.systemd}/bin/systemctl --user import-environment $session_env_vars
+
+      if [ -x ${pkgs.dbus}/bin/dbus-update-activation-environment ]; then
+        ${pkgs.dbus}/bin/dbus-update-activation-environment $session_env_vars
+      fi
+
+      ${pkgs.systemd}/bin/systemctl --user --wait start niri.service
+      ${pkgs.systemd}/bin/systemctl --user start --job-mode=replace-irreversibly niri-shutdown.target
+      ${pkgs.systemd}/bin/systemctl --user unset-environment WAYLAND_DISPLAY DISPLAY XDG_SESSION_TYPE XDG_SESSION_DESKTOP XDG_CURRENT_DESKTOP NIRI_SOCKET
+    '';
+  in {
 
     # ── Compositor & System Services ────────────────────────────────────────
     hardware.graphics.enable = true;
@@ -24,7 +45,7 @@
     services.greetd = {
       enable = true;
       settings.default_session = {
-        command = "${pkgs.greetd.tuigreet}/bin/tuigreet --time --cmd '${pkgs.niri}/bin/niri-session'";
+        command = "${pkgs.greetd.tuigreet}/bin/tuigreet --time --cmd '${niriSession}'";
         user    = "greeter";
       };
     };

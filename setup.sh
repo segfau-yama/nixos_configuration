@@ -15,6 +15,7 @@ set -euo pipefail
 REPO_URL="https://github.com/segfau-yama/nixos_configuration.git"
 MOUNT_ROOT="/mnt"
 STATE_VERSION="25.05"
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 
 # -- Color definitions ---------------------------------------------------------
 RED='\033[0;31m'
@@ -47,6 +48,26 @@ sub_banner() {
   echo -e "\n${BOLD}------------------------------------------------------${RESET}"
   echo -e "${BOLD}  $*${RESET}"
   echo -e "${BOLD}------------------------------------------------------${RESET}"
+}
+
+source_tree_available() {
+  [[ -f "${SCRIPT_DIR}/flake.nix" && -d "${SCRIPT_DIR}/modules" ]]
+}
+
+copy_source_tree() {
+  local src="$1"
+  local dst="$2"
+
+  mkdir -p "$dst"
+  if command -v rsync >/dev/null 2>&1; then
+    rsync -a \
+      --exclude '/jadeos_setting_tui/target' \
+      "$src"/ "$dst"/
+  else
+    tar -C "$src" \
+      --exclude './jadeos_setting_tui/target' \
+      -cf - . | tar -C "$dst" -xf -
+  fi
 }
 
 # -- Global variables ----------------------------------------------------------
@@ -706,9 +727,9 @@ phase2_user_config() {
     fi
 
     if [[ "$ADMIN_SELECTED" == "true" ]]; then
-      echo -e "  ${DIM}2) admin  administrator (CUI only)      [added]${RESET}"
+      echo -e "  ${DIM}2) admin  administrator (GUI-capable)  [added]${RESET}"
     else
-      echo -e "  ${BOLD}2)${RESET} admin  administrator (CUI only)      ${DIM}[default config]${RESET}"
+      echo -e "  ${BOLD}2)${RESET} admin  administrator (GUI-capable)  ${DIM}[default config]${RESET}"
     fi
 
     echo -e "  ${BOLD}3)${RESET} Add custom user"
@@ -738,6 +759,7 @@ phase2_user_config() {
           warn "admin is already added."
         else
           ADMIN_SELECTED=true
+          HAS_GUI_USER=true
           USER_MODULE_NAMES+=("admin")
           set_user_password_hash "admin"
           success "Added admin. (uses existing modules/users/admin/nixos.nix)"
@@ -1123,15 +1145,21 @@ phase3_install() {
   swapon /dev/disk/by-label/swap
   success "Mounted (root=${MOUNT_ROOT})"
 
-  # -- Clone repository ------------------------------------------------------
-  step "Cloning Repository"
+  # -- Prepare configuration repository --------------------------------------
+  step "Preparing Configuration Repository"
   mkdir -p "${MOUNT_ROOT}/etc/nixos"
-  cd "${MOUNT_ROOT}/etc/nixos"
-  git init
-  git remote add origin "$REPO_URL"
-  git fetch origin
-  git checkout -t origin/main
-  success "Repository cloned to ${MOUNT_ROOT}/etc/nixos"
+  if source_tree_available; then
+    info "Using local source tree: ${SCRIPT_DIR}"
+    copy_source_tree "${SCRIPT_DIR}" "${MOUNT_ROOT}/etc/nixos"
+    success "Configuration copied to ${MOUNT_ROOT}/etc/nixos"
+  else
+    cd "${MOUNT_ROOT}/etc/nixos"
+    git init
+    git remote add origin "$REPO_URL"
+    git fetch origin
+    git checkout -t origin/main
+    success "Repository cloned to ${MOUNT_ROOT}/etc/nixos"
+  fi
 
   # -- Generate hardware configuration ---------------------------------------
   step "Generating hardware-configuration.nix"
@@ -1191,6 +1219,12 @@ phase3_install() {
   # -- git add for flake tracking --------------------------------------------
   step "Tracking files with git add ."
   cd "${MOUNT_ROOT}/etc/nixos"
+  if [[ ! -d .git ]]; then
+    git init
+  fi
+  if ! git remote get-url origin >/dev/null 2>&1; then
+    git remote add origin "$REPO_URL"
+  fi
   git add .
   success "All files tracked"
 
