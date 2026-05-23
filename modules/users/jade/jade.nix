@@ -52,7 +52,6 @@ in
 
     # ユーザーアプリ: デスクトップ基盤や専用モジュールに属さないアプリを直接管理する。
     home.packages = with pkgs; [
-      wezterm      # ターミナルエミュレーター
       spacedrive   # ファイルマネージャー
       pwvucontrol  # PipeWire ネイティブ GUI ボリュームコントローラー
       pamixer      # コマンドライン ボリューム操作

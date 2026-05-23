@@ -64,6 +64,13 @@
   # desktop (Home Manager): Niri の設定・IronBar・通知デーモン・壁紙を一括管理する。
   flake.modules.homeManager.desktop = { pkgs, ... }: {
 
+    # Niri セッション復旧・操作用の最小 GUI ツール。
+    # カスタム GUI ユーザーでも Mod+Return で必ず端末を開けるようにする。
+    home.packages = with pkgs; [
+      swww
+      wezterm
+    ];
+
     # ── App Launcher: tofi (Catppuccin Mocha テーマ) ─────────────────────────
     # programs.tofi は NixOS モジュールにはないため HM 側で管理する。
     programs.tofi = {
@@ -350,8 +357,6 @@
 
     # ── 壁紙マネージャー: swww ───────────────────────────────────────────────
     # HM に services.swww が未実装のため systemd ユーザーサービスで管理する。
-    home.packages = [ pkgs.swww ];
-
     systemd.user.services.swww-daemon = {
       Unit = {
         Description = "swww wallpaper daemon";
