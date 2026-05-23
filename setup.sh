@@ -73,6 +73,7 @@ BOOT_TYPE="systemd-boot"  # "systemd-boot" | "grub"
 # Phase 2: User configuration
 declare -a USER_MODULE_NAMES=()   # module names to list in host config imports
 declare -a CUSTOM_USERS=()        # "username:type:description:prog1 prog2..."
+declare -a USER_PASSWORD_HASHES=() # "username:hashed-password"
 JADE_SELECTED=false
 ADMIN_SELECTED=false
 HAS_GUI_USER=false
@@ -549,6 +550,49 @@ select_programs_dev() {
 }
 
 # -----------------------------------------------------------------------------
+# User password input
+# -----------------------------------------------------------------------------
+set_user_password_hash() {
+  local uname="$1"
+  local pass1=""
+  local pass2=""
+  local hash=""
+
+  echo
+  step "Password for ${uname}"
+  while true; do
+    read -rsp "  Password: " pass1
+    echo
+    if [[ -z "$pass1" ]]; then
+      warn "Password cannot be empty."
+      continue
+    fi
+
+    read -rsp "  Confirm password: " pass2
+    echo
+    if [[ "$pass1" != "$pass2" ]]; then
+      warn "Passwords do not match."
+      continue
+    fi
+
+    break
+  done
+
+  if command -v mkpasswd >/dev/null 2>&1; then
+    hash="$(mkpasswd -m yescrypt "$pass1")"
+  elif command -v openssl >/dev/null 2>&1; then
+    hash="$(openssl passwd -6 -stdin <<<"$pass1")"
+  else
+    error "Neither mkpasswd nor openssl is available to hash the password."
+  fi
+
+  USER_PASSWORD_HASHES+=("${uname}:${hash}")
+  pass1=""
+  pass2=""
+  success "Password hash stored for ${uname}."
+}
+
+# -----------------------------------------------------------------------------
 # Add custom user
 # -----------------------------------------------------------------------------
 add_custom_user() {
@@ -561,6 +605,10 @@ add_custom_user() {
     read -rp "  Enter username: " uname
     if [[ -z "$uname" ]]; then
       warn "Username cannot be empty."
+      continue
+    fi
+    if [[ ! "$uname" =~ ^[a-z_][a-z0-9_-]*$ ]]; then
+      warn "Use a Linux username such as 'jade' or 'admin' (lowercase letters, digits, '_' or '-')."
       continue
     fi
     # Duplicate check
@@ -629,6 +677,7 @@ add_custom_user() {
   local prog_str="${uprograms[*]:-}"
   CUSTOM_USERS+=("${uname}:${utype}:${udesc}:${prog_str}")
   USER_MODULE_NAMES+=("$uname")
+  set_user_password_hash "$uname"
 
   success "Added ${uname}. (${utype} / programs: ${prog_str:-none})"
 }
@@ -680,6 +729,7 @@ phase2_user_config() {
           JADE_SELECTED=true
           HAS_GUI_USER=true
           USER_MODULE_NAMES+=("jade")
+          set_user_password_hash "jade"
           success "Added jade. (uses existing modules/users/jade/jade.nix)"
         fi
         ;;
@@ -689,6 +739,7 @@ phase2_user_config() {
         else
           ADMIN_SELECTED=true
           USER_MODULE_NAMES+=("admin")
+          set_user_password_hash "admin"
           success "Added admin. (uses existing modules/users/admin/nixos.nix)"
         fi
         ;;
