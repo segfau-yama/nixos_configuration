@@ -20,11 +20,11 @@
     services.seatd.enable  = true;
 
     # ── Login Manager: greetd + tuigreet ────────────────────────────────────
-    # tuigreet は TUI 上でユーザー選択し、dbus-run-session 経由で niri を起動する。
+    # tuigreet は TUI 上でユーザー選択し、niri-session 経由で systemd user session として niri を起動する。
     services.greetd = {
       enable = true;
       settings.default_session = {
-        command = "${pkgs.greetd.tuigreet}/bin/tuigreet --time --cmd 'dbus-run-session niri --session'";
+        command = "${pkgs.greetd.tuigreet}/bin/tuigreet --time --cmd '${pkgs.niri}/bin/niri-session'";
         user    = "greeter";
       };
     };
