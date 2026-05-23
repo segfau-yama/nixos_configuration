@@ -812,13 +812,24 @@ generate_host_config() {
   # SSH value
   local ssh_val="$SSH_ENABLED"
 
+  # Password config block
+  local password_nix=""
+  local entry uname hash
+  for entry in "${USER_PASSWORD_HASHES[@]}"; do
+    uname="${entry%%:*}"
+    hash="${entry#*:}"
+    password_nix+=$'\n'"    users.users.\"${uname}\".initialHashedPassword = \"${hash}\";"
+  done
+
   # Boot loader config block
   local boot_loader_nix
   if [[ "$BOOT_TYPE" == "systemd-boot" ]]; then
     boot_loader_nix="    boot.loader.systemd-boot.enable = true;
     boot.loader.efi.canTouchEfiVariables = true;"
   else
-    boot_loader_nix="    boot.loader.grub = {
+    boot_loader_nix="    boot.loader.systemd-boot.enable = lib.mkForce false;
+    boot.loader.efi.canTouchEfiVariables = lib.mkForce false;
+    boot.loader.grub = {
       enable  = true;
       device  = \"${DEVICE}\";
       efiSupport = false;
@@ -852,6 +863,9 @@ ${imports_lines}
 
     # SSH
     services.openssh.enable = ${ssh_val};
+
+    # User passwords
+${password_nix}
 
     # Boot loader
 ${boot_loader_nix}
