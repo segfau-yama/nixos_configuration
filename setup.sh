@@ -362,7 +362,7 @@ phase1_pc_config() {
   step "GPU Configuration"
   echo -e "  Detected GPU: ${BOLD}${GPU_BRAND}${RESET} (${GPU_TYPE})"
   echo
-  local gpu_opts=("nvidia:NVIDIA proprietary driver" "amd:AMD open-source driver" "intel:Intel modesetting driver" "none:No GPU / Virtual Machine")
+  local gpu_opts=("nvidia:NVIDIA proprietary driver" "amd:AMD open-source driver" "intel:Intel modesetting driver" "none:Virtual Machine / basic Mesa graphics")
   i=1
   for opt in "${gpu_opts[@]}"; do
     local key="${opt%%:*}"

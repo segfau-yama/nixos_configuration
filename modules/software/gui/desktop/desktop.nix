@@ -11,6 +11,8 @@
   flake.modules.nixos.desktop = { pkgs, ... }: {
 
     # ── Compositor & System Services ────────────────────────────────────────
+    hardware.graphics.enable = true;
+
     programs.niri.enable   = true;
     programs.dconf.enable  = true;
     services.dbus.enable   = true;
@@ -56,8 +58,6 @@
       wayshot       # スクリーンショット
       wlsunset      # ブルーライトカット (夜間モード)
       ironbar       # IronBar ステータスバー (greetd セッション前から起動するため system 側)
-      swww          # 壁紙デーモン
-      wezterm       # 初回起動時のフォールバック端末
     ];
   };
 
@@ -122,21 +122,18 @@
         center-focused-column "never"
       }
 
-      spawn-at-startup "${pkgs.swww}/bin/swww-daemon"
-      spawn-at-startup "${pkgs.bash}/bin/sh" "-c" "sleep 1; ${pkgs.swww}/bin/swww clear 1e1e2e"
-      spawn-at-startup "${pkgs.fcitx5}/bin/fcitx5" "-d"
-      spawn-at-startup "${pkgs.ironbar}/bin/ironbar"
-      spawn-at-startup "${pkgs.wlsunset}/bin/wlsunset" "-l" "35.7" "-L" "139.7"
-      spawn-at-startup "${pkgs.wezterm}/bin/wezterm"
+      spawn-at-startup "fcitx5" "-d"
+      spawn-at-startup "ironbar"
+      spawn-at-startup "wlsunset" "-l" "35.7" "-L" "139.7"
 
       binds {
-        Mod+Return { spawn "${pkgs.wezterm}/bin/wezterm"; }
-        Mod+D      { spawn "${pkgs.tofi}/bin/tofi-drun"; }
+        Mod+Return { spawn "wezterm"; }
+        Mod+D      { spawn "tofi-drun"; }
         Mod+W      { spawn "chromium"; }
         Mod+E      { spawn "spacedrive"; }
         Mod+C      { close-window; }
         Mod+F      { fullscreen-window; }
-        Mod+P      { spawn "${pkgs.wayshot}/bin/wayshot" "--region"; }
+        Mod+P      { spawn "wayshot" "--region"; }
 
         XF86AudioRaiseVolume { spawn "wpctl" "set-volume" "-l" "1" "@DEFAULT_AUDIO_SINK@" "5%+"; }
         XF86AudioLowerVolume { spawn "wpctl" "set-volume" "@DEFAULT_AUDIO_SINK@" "5%-"; }

@@ -141,7 +141,7 @@ my.hardware.cpu = "amd";     # "intel"  | "amd" | "aarch64"
 | `nvidia` | nvidia proprietary driver・modesetting・Vulkan・nvtop |
 | `amd` | amdgpu driver・Mesa・Vulkan |
 | `intel` | modesetting・intel-media-driver・OpenCL・Vulkan |
-| `none` | OpenGL 無効（VM 用） |
+| `none` | VM / 汎用 Mesa・QEMU Guest Agent・SPICE Agent |
 
 GPU が `none` 以外のとき、x86_64 環境では `hardware.graphics.enable32Bit`・Steam・Gamemode も自動で有効になります。
 
@@ -356,7 +356,7 @@ mkfs.ext4 -L nixos -F /dev/vda2
 mkswap -L swap /dev/vda3
 ```
 
-ホスト設定では GPU を `"none"` に設定するとドライバーが無効化され VM に適した構成になります。
+ホスト設定では GPU を `"none"` に設定すると、NVIDIA/AMD/Intel 固有ドライバーは使わず、VM 向けの汎用 Mesa/DRI と QEMU Guest Agent / SPICE Agent を有効化します。
 
 ```bash
 # VM 向けホスト設定での例

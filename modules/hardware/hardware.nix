@@ -24,6 +24,21 @@
 
     config = lib.mkMerge [
 
+      # ── 共通: GUI / Wayland 用の Mesa/DRI 基盤 ────────────────────────────
+      # VM の QXL/Virtio GPU は my.hardware.gpu = "none" として扱うが、
+      # Niri などの Wayland コンポジターには Mesa/DRI が必要。
+      (lib.mkIf (config.my.hardware.gpu == "none") {
+        hardware.graphics.enable = true;
+
+        environment.systemPackages = with pkgs; [
+          mesa
+          vulkan-tools
+        ];
+
+        services.qemuGuest.enable = lib.mkDefault true;
+        services.spice-vdagentd.enable = lib.mkDefault true;
+      })
+
       # ── 共通: GPU あり → OpenGL を有効化 ─────────────────────────────────
       (lib.mkIf (config.my.hardware.gpu != "none") {
         hardware.graphics.enable = true;
