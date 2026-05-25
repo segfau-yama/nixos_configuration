@@ -1,12 +1,16 @@
 use ratatui::{
     Frame,
     layout::{Constraint, Direction, Layout},
-    style::{Modifier, Style, Stylize},
-    text::{Line, Text},
+    style::{Color, Modifier, Style},
+    text::{Line, Span},
     widgets::{Block, Borders, Paragraph, Tabs, Wrap},
 };
 
 use crate::app::{App, Screen};
+use crate::components::controls::controls_line;
+use crate::components::current_config::current_config_panel;
+use crate::components::form::render_form_section;
+use crate::logic::screen_content::{main_panel_text, screen_form_section};
 
 pub fn render(frame: &mut Frame, app: &App) {
     let layout = Layout::default()
@@ -20,50 +24,71 @@ pub fn render(frame: &mut Frame, app: &App) {
 
     let tabs = Tabs::new(["PC Config", "Users", "Install"])
         .select(match app.screen {
-            Screen::UserMenu => 1,
+            Screen::UserMenu
+            | Screen::PresetUserPassword
+            | Screen::CustomUserBasic
+            | Screen::CustomUserType
+            | Screen::CustomUserPrograms
+            | Screen::CustomUserPassword
+            | Screen::UserAddResult => 1,
             Screen::Summary | Screen::Installing | Screen::Done => 2,
             _ => 0,
         })
-        .block(Block::default().borders(Borders::ALL).title("jadeos installer"))
-        .highlight_style(Style::default().add_modifier(Modifier::BOLD));
-    frame.render_widget(tabs, layout[0]);
-
-    let body = Paragraph::new(body_text(app))
         .block(
             Block::default()
                 .borders(Borders::ALL)
-                .title(app.screen.title()),
+                .border_style(Style::default().fg(Color::Blue)),
         )
-        .wrap(Wrap { trim: false });
-    frame.render_widget(body, layout[1]);
+        .style(Style::default().fg(Color::DarkGray))
+        .highlight_style(
+            Style::default()
+                .fg(Color::Cyan)
+                .add_modifier(Modifier::BOLD),
+        )
+        .divider(Span::styled(" | ", Style::default().fg(Color::DarkGray)));
+    frame.render_widget(tabs, layout[0]);
 
-    let help = Paragraph::new(Line::from(vec![
-        "q".bold(),
-        " quit   ".into(),
-        "Enter/Right".bold(),
-        " next   ".into(),
-        "Esc/Left".bold(),
-        " back".into(),
-    ]))
-    .block(Block::default().borders(Borders::ALL).title("controls"));
+    let body_layout = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([Constraint::Percentage(68), Constraint::Percentage(32)])
+        .split(layout[1]);
+
+    let body_block = Block::default()
+        .borders(Borders::ALL)
+        .title(format!(" {} ", app.screen.title()))
+        .border_style(Style::default().fg(main_border_color(app.screen)));
+    let body_inner = body_block.inner(body_layout[0]);
+    frame.render_widget(body_block, body_layout[0]);
+
+    let body_inner_layout = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Length(3), Constraint::Min(3)])
+        .split(body_inner);
+
+    let header = Paragraph::new(main_panel_text(app))
+        .style(Style::default().fg(Color::Gray))
+        .wrap(Wrap { trim: false });
+    frame.render_widget(header, body_inner_layout[0]);
+
+    let section = screen_form_section(app);
+    render_form_section(frame, body_inner_layout[1], &section);
+    frame.render_widget(current_config_panel(app), body_layout[1]);
+
+    let help = Paragraph::new(Line::from(controls_line())).block(
+        Block::default()
+            .borders(Borders::ALL)
+            .title(" controls ")
+            .border_style(Style::default().fg(Color::DarkGray)),
+    );
     frame.render_widget(help, layout[2]);
 }
 
-fn body_text(app: &App) -> Text<'static> {
-    let lines = vec![
-        Line::from(format!("phase: {}", app.screen.phase())),
-        Line::from(format!("screen: {}", app.screen.title())),
-        Line::default(),
-        Line::from("Phase 1 skeleton is active."),
-        Line::from("This build wires state, event loop, and placeholder screens."),
-        Line::from("Phase 2 will replace placeholders with actual setup.sh forms."),
-        Line::default(),
-        Line::from(format!("hostname: {}", app.config.hostname)),
-        Line::from(format!("boot loader: {}", app.config.boot_type.label())),
-        Line::from(format!("gpu: {}", app.config.gpu_type.label())),
-        Line::from(format!("cpu: {}", app.config.cpu_type.label())),
-        Line::from(format!("locale: {}", app.config.locale)),
-    ];
-
-    Text::from(lines)
+fn main_border_color(screen: Screen) -> Color {
+    match screen {
+        Screen::Welcome | Screen::Done => Color::Green,
+        Screen::Installing => Color::Yellow,
+        Screen::Summary => Color::Magenta,
+        Screen::UserMenu => Color::Cyan,
+        _ => Color::Blue,
+    }
 }

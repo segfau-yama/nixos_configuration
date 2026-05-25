@@ -55,12 +55,23 @@ pub enum UserType {
     Cui,
 }
 
+impl UserType {
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Gui => "gui",
+            Self::Cui => "cui",
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct UserConfig {
     pub username: String,
     pub display_name: String,
     pub user_type: UserType,
     pub programs: Vec<String>,
+    pub password_hash: String,
+    pub is_preset: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -75,7 +86,9 @@ pub struct InstallConfig {
     pub ssh_enabled: bool,
     pub storage_enabled: bool,
     pub gpu_type: GpuType,
+    pub gpu_custom: String,
     pub cpu_type: CpuType,
+    pub cpu_custom: String,
     pub boot_type: BootType,
     pub users: Vec<UserConfig>,
 }
@@ -93,9 +106,25 @@ impl Default for InstallConfig {
             ssh_enabled: false,
             storage_enabled: false,
             gpu_type: GpuType::None,
+            gpu_custom: String::new(),
             cpu_type: CpuType::Amd,
+            cpu_custom: String::new(),
             boot_type: BootType::SystemdBoot,
             users: Vec::new(),
         }
+    }
+}
+
+impl InstallConfig {
+    pub fn has_gui_user(&self) -> bool {
+        self.users
+            .iter()
+            .any(|user| user.user_type == UserType::Gui)
+    }
+
+    pub fn needs_programming_cli(&self) -> bool {
+        self.users
+            .iter()
+            .any(|user| user.programs.iter().any(|program| program == "programming"))
     }
 }

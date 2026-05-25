@@ -1,5 +1,8 @@
 mod app;
+mod components;
 mod config;
+mod infra;
+mod logic;
 mod ui;
 
 use std::io;

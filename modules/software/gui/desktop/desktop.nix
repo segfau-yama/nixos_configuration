@@ -11,6 +11,10 @@
   flake.modules.nixos.desktop = { pkgs, ... }:
   let
     niriSession = pkgs.writeShellScript "niri-session-explicit-env" ''
+      export XDG_SESSION_TYPE=wayland
+      export XDG_SESSION_DESKTOP=niri
+      export XDG_CURRENT_DESKTOP=niri
+
       if ${pkgs.systemd}/bin/systemctl --user -q is-active niri.service; then
         echo "A niri session is already running."
         exit 1
@@ -18,16 +22,40 @@
 
       ${pkgs.systemd}/bin/systemctl --user reset-failed
 
-      session_env_vars="DISPLAY WAYLAND_DISPLAY XDG_SESSION_TYPE XDG_SESSION_DESKTOP XDG_CURRENT_DESKTOP NIRI_SOCKET XCURSOR_SIZE XCURSOR_THEME PATH SSH_AUTH_SOCK"
-      ${pkgs.systemd}/bin/systemctl --user import-environment $session_env_vars
+      session_env_vars=(
+        XDG_SESSION_TYPE
+        XDG_SESSION_DESKTOP
+        XDG_CURRENT_DESKTOP
+        XDG_RUNTIME_DIR
+        XCURSOR_SIZE
+        XCURSOR_THEME
+        PATH
+        SSH_AUTH_SOCK
+        NIXOS_OZONE_WL
+        MOZ_ENABLE_WAYLAND
+        ELECTRON_OZONE_PLATFORM_HINT
+        XMODIFIERS
+        INPUT_METHOD
+      )
+      import_args=()
 
-      if [ -x ${pkgs.dbus}/bin/dbus-update-activation-environment ]; then
-        ${pkgs.dbus}/bin/dbus-update-activation-environment $session_env_vars
+      for var_name in "''${session_env_vars[@]}"; do
+        if [ -n "''${!var_name+x}" ]; then
+          import_args+=("$var_name")
+        fi
+      done
+
+      if [ "''${#import_args[@]}" -gt 0 ]; then
+        ${pkgs.systemd}/bin/systemctl --user import-environment "''${import_args[@]}"
+      fi
+
+      if [ "''${#import_args[@]}" -gt 0 ] && [ -x ${pkgs.dbus}/bin/dbus-update-activation-environment ]; then
+        ${pkgs.dbus}/bin/dbus-update-activation-environment --systemd "''${import_args[@]}"
       fi
 
       ${pkgs.systemd}/bin/systemctl --user --wait start niri.service
       ${pkgs.systemd}/bin/systemctl --user start --job-mode=replace-irreversibly niri-shutdown.target
-      ${pkgs.systemd}/bin/systemctl --user unset-environment WAYLAND_DISPLAY DISPLAY XDG_SESSION_TYPE XDG_SESSION_DESKTOP XDG_CURRENT_DESKTOP NIRI_SOCKET
+      ${pkgs.systemd}/bin/systemctl --user unset-environment XDG_SESSION_TYPE XDG_SESSION_DESKTOP XDG_CURRENT_DESKTOP
     '';
   in {
 

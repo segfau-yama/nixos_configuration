@@ -70,6 +70,75 @@ copy_source_tree() {
   fi
 }
 
+sync_repo_after_install() {
+  local repo_dir="$1"
+  local branch="build/${HOSTNAME}"
+  local ts msg push_confirm sensitive_files
+
+  step "Syncing Repository (post-install)"
+
+  if [[ ! -d "$repo_dir/.git" ]]; then
+    warn "Skip repo sync: not a git repository (${repo_dir})."
+    return
+  fi
+
+  cd "$repo_dir" || {
+    warn "Skip repo sync: failed to enter ${repo_dir}."
+    return
+  }
+
+  if ! git remote get-url origin >/dev/null 2>&1; then
+    git remote add origin "$REPO_URL" || {
+      warn "Skip repo sync: failed to configure origin remote."
+      return
+    }
+  fi
+
+  git add .
+
+  if git diff --cached --quiet; then
+    info "No repository updates to push after install."
+    return
+  fi
+
+  if git show-ref --verify --quiet "refs/heads/$branch"; then
+    git checkout "$branch" || {
+      warn "Skip repo sync: failed to checkout branch '$branch'."
+      return
+    }
+  else
+    git checkout -b "$branch" || {
+      warn "Skip repo sync: failed to create branch '$branch'."
+      return
+    }
+  fi
+
+  sensitive_files="$(git diff --cached --name-only -G 'initialHashedPassword|hashedPassword' | sed '/^$/d')"
+  if [[ -n "$sensitive_files" ]]; then
+    warn "Password-hash related changes are included in this push:"
+    echo "$sensitive_files" | sed 's/^/  - /'
+    read -rp "  Continue push to origin/${branch}? [y/N]: " push_confirm
+    if [[ ! "$push_confirm" =~ ^[Yy]$ ]]; then
+      warn "Skip repository update by user choice. No commit or push was performed."
+      return
+    fi
+  fi
+
+  ts="$(date +%Y%m%d-%H%M%S)"
+  msg="build(${HOSTNAME}): post-install sync ${ts}"
+
+  if ! git commit -m "$msg" >/dev/null 2>&1; then
+    info "No commit created (nothing new to commit)."
+    return
+  fi
+
+  if git push -u origin "$branch"; then
+    success "Repository updated and pushed to origin/${branch}."
+  else
+    warn "Repository update was committed locally, but push to origin/${branch} failed."
+  fi
+}
+
 # -- Global variables ----------------------------------------------------------
 # Phase 1: PC configuration
 DEVICE=""
@@ -95,10 +164,101 @@ BOOT_TYPE="systemd-boot"  # "systemd-boot" | "grub"
 declare -a USER_MODULE_NAMES=()   # module names to list in host config imports
 declare -a CUSTOM_USERS=()        # "username:type:description:prog1 prog2..."
 declare -a USER_PASSWORD_HASHES=() # "username:hashed-password"
-JADE_SELECTED=false
-ADMIN_SELECTED=false
+GREETER_USERNAME="greeter"
+declare -a PRESET_USERS=("jade" "admin")
+declare -A PRESET_DESC=(
+  [jade]="standard user (GUI desktop)"
+  [admin]="administrator (minimal CUI)"
+)
+declare -A PRESET_KIND=(
+  [jade]="gui"
+  [admin]="cui"
+)
+declare -A PRESET_MODULE_FILE=(
+  [jade]="modules/users/jade/jade.nix"
+  [admin]="modules/users/admin/nixos.nix"
+)
 HAS_GUI_USER=false
 NEEDS_PROGRAMMING_CLI=false
+
+user_exists() {
+  local uname="$1"
+  local u
+  for u in "${USER_MODULE_NAMES[@]}"; do
+    if [[ "$u" == "$uname" ]]; then
+      return 0
+    fi
+  done
+  return 1
+}
+
+is_reserved_username() {
+  local uname="$1"
+  local preset
+
+  if [[ "$uname" == "$GREETER_USERNAME" ]]; then
+    return 0
+  fi
+
+  for preset in "${PRESET_USERS[@]}"; do
+    if [[ "$uname" == "$preset" ]]; then
+      return 0
+    fi
+  done
+
+  return 1
+}
+
+count_interactive_users() {
+  local count=0
+  local u
+  for u in "${USER_MODULE_NAMES[@]}"; do
+    if [[ "$u" != "$GREETER_USERNAME" ]]; then
+      (( count++ ))
+    fi
+  done
+  echo "$count"
+}
+
+visible_user_list() {
+  local visible=()
+  local u
+  for u in "${USER_MODULE_NAMES[@]}"; do
+    if [[ "$u" != "$GREETER_USERNAME" ]]; then
+      visible+=("$u")
+    fi
+  done
+  echo "${visible[*]}"
+}
+
+ensure_greeter_user() {
+  if user_exists "$GREETER_USERNAME"; then
+    return
+  fi
+
+  USER_MODULE_NAMES+=("$GREETER_USERNAME")
+  info "System user '${GREETER_USERNAME}' added automatically for greetd."
+}
+
+add_preset_user() {
+  local uname="$1"
+  local kind="${PRESET_KIND[$uname]}"
+  local desc="${PRESET_DESC[$uname]}"
+  local module_file="${PRESET_MODULE_FILE[$uname]}"
+
+  if user_exists "$uname"; then
+    warn "${uname} is already added."
+    return
+  fi
+
+  if [[ "$kind" == "gui" ]]; then
+    HAS_GUI_USER=true
+  fi
+
+  USER_MODULE_NAMES+=("$uname")
+  set_user_password_hash "$uname"
+  success "Added ${uname}. (${desc}; uses ${module_file})"
+}
 
 # -----------------------------------------------------------------------------
 # Hardware detection
@@ -633,17 +793,16 @@ add_custom_user() {
       continue
     fi
     # Duplicate check
-    local dup=false
-    for existing in "${USER_MODULE_NAMES[@]:-}"; do
-      if [[ "$existing" == "$uname" ]]; then
-        dup=true
-        break
-      fi
-    done
-    if [[ "$dup" == "true" ]]; then
+    if user_exists "$uname"; then
       warn "${uname} is already added. Please choose a different name."
       continue
     fi
+
+    if is_reserved_username "$uname"; then
+      warn "${uname} is reserved for a preset/system user. Please choose a different name."
+      continue
+    fi
+
     break
   done
 
@@ -710,82 +869,66 @@ phase2_user_config() {
   echo
   banner "Step 2/3: User Configuration"
 
+  ensure_greeter_user
+
   while true; do
+    local interactive_users
+    interactive_users=$(count_interactive_users)
+
     # Current user list
-    if [[ ${#USER_MODULE_NAMES[@]} -gt 0 ]]; then
-      echo -e "  ${DIM}Added users: ${USER_MODULE_NAMES[*]}${RESET}"
+    if [[ "$interactive_users" -gt 0 ]]; then
+      echo -e "  ${DIM}Added users: $(visible_user_list)${RESET}"
       echo
     fi
 
     # Choices
     echo -e "  ${BOLD}Add a user:${RESET}"
 
-    if [[ "$JADE_SELECTED" == "true" ]]; then
-      echo -e "  ${DIM}1) jade   standard user (GUI desktop)  [added]${RESET}"
-    else
-      echo -e "  ${BOLD}1)${RESET} jade   standard user (GUI desktop)  ${DIM}[default config]${RESET}"
-    fi
+    local i preset_name custom_opt
+    i=1
+    for preset_name in "${PRESET_USERS[@]}"; do
+      if user_exists "$preset_name"; then
+        echo -e "  ${DIM}${i}) ${preset_name}  ${PRESET_DESC[$preset_name]}  [added]${RESET}"
+      else
+        echo -e "  ${BOLD}${i})${RESET} ${preset_name}  ${PRESET_DESC[$preset_name]}  ${DIM}[default config]${RESET}"
+      fi
+      (( i++ ))
+    done
 
-    if [[ "$ADMIN_SELECTED" == "true" ]]; then
-      echo -e "  ${DIM}2) admin  administrator (GUI-capable)  [added]${RESET}"
-    else
-      echo -e "  ${BOLD}2)${RESET} admin  administrator (GUI-capable)  ${DIM}[default config]${RESET}"
-    fi
+    custom_opt="$i"
+    echo -e "  ${BOLD}${custom_opt})${RESET} Add custom user"
 
-    echo -e "  ${BOLD}3)${RESET} Add custom user"
-
-    if [[ ${#USER_MODULE_NAMES[@]} -gt 0 ]]; then
+    if [[ "$interactive_users" -gt 0 ]]; then
       echo -e "  ${BOLD}0)${RESET} Finish user configuration"
     fi
     echo
 
     local sel
-    read -rp "  Select [0-3]: " sel
+    read -rp "  Select [0-${custom_opt}]: " sel
 
-    case "$sel" in
-      1)
-        if [[ "$JADE_SELECTED" == "true" ]]; then
-          warn "jade is already added."
-        else
-          JADE_SELECTED=true
-          HAS_GUI_USER=true
-          USER_MODULE_NAMES+=("jade")
-          set_user_password_hash "jade"
-          success "Added jade. (uses existing modules/users/jade/jade.nix)"
-        fi
-        ;;
-      2)
-        if [[ "$ADMIN_SELECTED" == "true" ]]; then
-          warn "admin is already added."
-        else
-          ADMIN_SELECTED=true
-          HAS_GUI_USER=true
-          USER_MODULE_NAMES+=("admin")
-          set_user_password_hash "admin"
-          success "Added admin. (uses existing modules/users/admin/nixos.nix)"
-        fi
-        ;;
-      3)
-        add_custom_user
-        ;;
-      0)
-        if [[ ${#USER_MODULE_NAMES[@]} -eq 0 ]]; then
-          warn "Please add at least one user."
-          continue
-        fi
-        break
-        ;;
-      *)
-        warn "Please enter a valid choice."
+    if [[ "$sel" == "0" ]]; then
+      if [[ "$interactive_users" -eq 0 ]]; then
+        warn "Please add at least one user."
         continue
-        ;;
-    esac
+      fi
+      break
+    fi
+
+    if [[ "$sel" =~ ^[0-9]+$ ]] && (( sel >= 1 && sel <= ${#PRESET_USERS[@]} )); then
+      add_preset_user "${PRESET_USERS[$(( sel - 1 ))]}"
+    elif [[ "$sel" == "$custom_opt" ]]; then
+      add_custom_user
+    else
+      warn "Please enter a valid choice."
+      continue
+    fi
 
     echo
     local more
     read -rp "  Add another user? [y/N]: " more
     if [[ ! "$more" =~ ^[Yy]$ ]]; then
-      if [[ ${#USER_MODULE_NAMES[@]} -eq 0 ]]; then
+      interactive_users=$(count_interactive_users)
+      if [[ "$interactive_users" -eq 0 ]]; then
         warn "Please add at least one user."
       else
         break
@@ -795,7 +938,7 @@ phase2_user_config() {
   done
 
   echo
-  success "Phase 2 complete: User configuration finalized. (${USER_MODULE_NAMES[*]})"
+  success "Phase 2 complete: User configuration finalized. ($(visible_user_list))"
 }
 
 # -----------------------------------------------------------------------------
@@ -1092,7 +1235,7 @@ phase3_install() {
   echo -e "  Timezone             : ${TIMEZONE}"
   echo -e "  SSH                  : ${SSH_ENABLED}"
   echo -e "  nix-auto-storage     : ${STORAGE_ENABLED}"
-  echo -e "  Users                : ${BOLD}${USER_MODULE_NAMES[*]}${RESET}"
+  echo -e "  Users                : ${BOLD}$(visible_user_list)${RESET}"
   echo
   echo -e "  ${RED}${BOLD}WARNING: ALL DATA on ${DEVICE} will be erased.${RESET}"
   echo
@@ -1232,6 +1375,10 @@ phase3_install() {
   echo
   info "Starting nixos-install: .#${HOSTNAME}"
   nixos-install --flake "${MOUNT_ROOT}/etc/nixos#${HOSTNAME}"
+
+  # -- Post-install repository update ---------------------------------------
+  # インストール完了後に生成済み設定を build ブランチへ反映する。
+  sync_repo_after_install "${MOUNT_ROOT}/etc/nixos"
 
   # -- Done ------------------------------------------------------------------
   echo
