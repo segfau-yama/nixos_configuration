@@ -13,7 +13,16 @@
     # ── Compositor & System Services ────────────────────────────────────────
     hardware.graphics.enable = true;
 
-    programs.niri.enable   = true;
+    programs.niri.enable = true;
+    programs.niri.package = pkgs.niri.overrideAttrs (old: {
+      postInstall = (old.postInstall or "") + ''
+        substituteInPlace $out/bin/niri-session \
+          --replace-fail \
+            "systemctl --user import-environment" \
+            "systemctl --user import-environment XDG_SESSION_TYPE XDG_CURRENT_DESKTOP XDG_SESSION_DESKTOP XDG_RUNTIME_DIR WAYLAND_DISPLAY DISPLAY NIRI_SOCKET PATH"
+      '';
+    });
+
     programs.dconf.enable  = true;
     services.dbus.enable   = true;
     security.polkit.enable = true;
