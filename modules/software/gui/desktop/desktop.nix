@@ -7,57 +7,8 @@
   #   - greetd + tuigreet によるログインマネージャー
   #   - xdg-desktop-portal (gtk + gnome バックエンド)
   #   - Wayland 基本ツール + ironbar (シェル UI)
-  # ユーザーアプリ (wezterm / spacedrive 等) は homeManager.jade で管理する。
-  flake.modules.nixos.desktop = { pkgs, ... }:
-  let
-    niriSession = pkgs.writeShellScript "niri-session-explicit-env" ''
-      export XDG_SESSION_TYPE=wayland
-      export XDG_SESSION_DESKTOP=niri
-      export XDG_CURRENT_DESKTOP=niri
-
-      if ${pkgs.systemd}/bin/systemctl --user -q is-active niri.service; then
-        echo "A niri session is already running."
-        exit 1
-      fi
-
-      ${pkgs.systemd}/bin/systemctl --user reset-failed
-
-      session_env_vars=(
-        XDG_SESSION_TYPE
-        XDG_SESSION_DESKTOP
-        XDG_CURRENT_DESKTOP
-        XDG_RUNTIME_DIR
-        XCURSOR_SIZE
-        XCURSOR_THEME
-        PATH
-        SSH_AUTH_SOCK
-        NIXOS_OZONE_WL
-        MOZ_ENABLE_WAYLAND
-        ELECTRON_OZONE_PLATFORM_HINT
-        XMODIFIERS
-        INPUT_METHOD
-      )
-      import_args=()
-
-      for var_name in "''${session_env_vars[@]}"; do
-        if [ -n "''${!var_name+x}" ]; then
-          import_args+=("$var_name")
-        fi
-      done
-
-      if [ "''${#import_args[@]}" -gt 0 ]; then
-        ${pkgs.systemd}/bin/systemctl --user import-environment "''${import_args[@]}"
-      fi
-
-      if [ "''${#import_args[@]}" -gt 0 ] && [ -x ${pkgs.dbus}/bin/dbus-update-activation-environment ]; then
-        ${pkgs.dbus}/bin/dbus-update-activation-environment --systemd "''${import_args[@]}"
-      fi
-
-      ${pkgs.systemd}/bin/systemctl --user --wait start niri.service
-      ${pkgs.systemd}/bin/systemctl --user start --job-mode=replace-irreversibly niri-shutdown.target
-      ${pkgs.systemd}/bin/systemctl --user unset-environment XDG_SESSION_TYPE XDG_SESSION_DESKTOP XDG_CURRENT_DESKTOP
-    '';
-  in {
+  # ユーザーアプリ (spacedrive 等) は homeManager.jade で管理する。
+  flake.modules.nixos.desktop = { config, pkgs, ... }: {
 
     # ── Compositor & System Services ────────────────────────────────────────
     hardware.graphics.enable = true;
@@ -73,7 +24,7 @@
     services.greetd = {
       enable = true;
       settings.default_session = {
-        command = "${pkgs.greetd.tuigreet}/bin/tuigreet --time --cmd '${niriSession}'";
+        command = "${pkgs.greetd.tuigreet}/bin/tuigreet --time --cmd ${config.programs.niri.package}/bin/niri-session";
         user    = "greeter";
       };
     };
@@ -100,13 +51,16 @@
 
     # ── System Packages ──────────────────────────────────────────────────────
     # niri 本体は programs.niri.enable で自動インストール済み。
-    # tofi は homeManager.desktop の programs.tofi.enable で管理済み。
-    # ユーザーアプリ (wezterm / spacedrive / pwvucontrol 等) は homeManager.jade に移動済み。
+    # wezterm/tofi は Niri 起動直後のホットキーからも使えるよう system 側にも置く。
+    # ユーザーアプリ (spacedrive / pwvucontrol 等) は homeManager.jade に移動済み。
     environment.systemPackages = with pkgs; [
       wl-clipboard  # Wayland クリップボード
       wayshot       # スクリーンショット
       wlsunset      # ブルーライトカット (夜間モード)
       ironbar       # IronBar ステータスバー (greetd セッション前から起動するため system 側)
+      wezterm       # Niri hotkey fallback terminal
+      tofi          # Niri hotkey fallback launcher
+      xwayland-satellite # XWayland support for Niri
     ];
   };
 
