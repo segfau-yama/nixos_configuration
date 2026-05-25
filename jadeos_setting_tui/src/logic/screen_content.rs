@@ -3,12 +3,13 @@ use ratatui::{
     text::{Line, Span, Text},
 };
 
-use crate::app::{App, Screen, UserMenuChoice, program_options_for};
+use crate::app::{App, Screen, UserMenuChoice};
 use crate::components::form::{FormField, FormFieldRole, FormSection};
 use crate::config::UserType;
 use crate::logic::setup::{
     CPU_OPTIONS, GPU_OPTIONS, KEYBOARD_OPTIONS, LOCALE_OPTIONS, TIMEZONE_OPTIONS,
 };
+use crate::logic::user_programs::program_options_for;
 
 pub fn main_panel_text(app: &App) -> Text<'static> {
     Text::from(vec![
@@ -19,8 +20,7 @@ pub fn main_panel_text(app: &App) -> Text<'static> {
 
 pub fn screen_form_section(app: &App) -> FormSection {
     let active = app.active_field_for_current_screen();
-
-    match app.screen {
+    let mut section = match app.screen {
         Screen::Welcome => form_section(
             "welcome",
             vec![
@@ -235,9 +235,27 @@ pub fn screen_form_section(app: &App) -> FormSection {
             Some(active),
         ),
         Screen::UserMenu => form_section("users", user_menu_fields(app), Some(active)),
-        Screen::PresetUserPassword => {
-            form_section("preset password", password_fields(app), Some(active))
-        }
+        Screen::PresetUserPassword => form_section(
+            "preset password",
+            vec![
+                form_field(
+                    "status",
+                    app.pending_user
+                        .as_ref()
+                        .map(|user| format!("Set password for {}", user.username))
+                        .unwrap_or_else(|| "No pending user".to_string()),
+                    Some("Use popup window for password input".to_string()),
+                    FormFieldRole::ReadOnly,
+                ),
+                form_field(
+                    "flow",
+                    "preset user setup".to_string(),
+                    Some("Press Enter in popup to confirm".to_string()),
+                    FormFieldRole::ReadOnly,
+                ),
+            ],
+            None,
+        ),
         Screen::CustomUserBasic => {
             form_section("custom user", custom_basic_fields(app), Some(active))
         }
@@ -245,9 +263,27 @@ pub fn screen_form_section(app: &App) -> FormSection {
         Screen::CustomUserPrograms => {
             form_section("programs", custom_program_fields(app), Some(active))
         }
-        Screen::CustomUserPassword => {
-            form_section("custom password", password_fields(app), Some(active))
-        }
+        Screen::CustomUserPassword => form_section(
+            "custom password",
+            vec![
+                form_field(
+                    "status",
+                    app.pending_user
+                        .as_ref()
+                        .map(|user| format!("Set password for {}", user.username))
+                        .unwrap_or_else(|| "No pending user".to_string()),
+                    Some("Use popup window for password input".to_string()),
+                    FormFieldRole::ReadOnly,
+                ),
+                form_field(
+                    "flow",
+                    "custom user setup".to_string(),
+                    Some("Press Enter in popup to confirm".to_string()),
+                    FormFieldRole::ReadOnly,
+                ),
+            ],
+            None,
+        ),
         Screen::UserAddResult => form_section(
             "user added",
             vec![
@@ -284,15 +320,13 @@ pub fn screen_form_section(app: &App) -> FormSection {
                     FormFieldRole::ReadOnly,
                 ),
                 form_field(
-                    "confirm",
-                    app.install_confirmation.clone(),
-                    Some(app.user_message.clone().unwrap_or_else(|| {
-                        "Type 'yes' then press Enter to start installation".to_string()
-                    })),
-                    FormFieldRole::Text,
+                    "confirmation",
+                    "pending in popup".to_string(),
+                    Some("Install confirmation is handled in popup".to_string()),
+                    FormFieldRole::ReadOnly,
                 ),
             ],
-            Some(active),
+            None,
         ),
         Screen::Installing => form_section(
             "installing",
@@ -332,7 +366,40 @@ pub fn screen_form_section(app: &App) -> FormSection {
             ],
             None,
         ),
-    }
+    };
+    section.text_editing = app.is_editing();
+    section
+}
+
+pub fn screen_popup_section(app: &App) -> Option<FormSection> {
+    let active = app.active_field_for_current_screen();
+    let mut section = match app.screen {
+        Screen::PresetUserPassword => Some(form_section(
+            "preset password",
+            password_fields(app),
+            Some(active),
+        )),
+        Screen::CustomUserPassword => Some(form_section(
+            "custom password",
+            password_fields(app),
+            Some(active),
+        )),
+        Screen::Summary => Some(form_section(
+            "install confirmation",
+            vec![form_field(
+                "confirm",
+                app.install_confirmation.clone(),
+                Some(app.user_message.clone().unwrap_or_else(|| {
+                    "Type 'yes' then press Enter to start installation".to_string()
+                })),
+                FormFieldRole::Text,
+            )],
+            Some(active),
+        )),
+        _ => None,
+    }?;
+    section.text_editing = app.is_editing();
+    Some(section)
 }
 
 fn info_line(label: &'static str, value: &str) -> Line<'static> {
@@ -353,6 +420,7 @@ fn form_section(title: &str, fields: Vec<FormField>, active_field: Option<usize>
         title: title.to_string(),
         fields,
         active_field,
+        text_editing: false,
     }
 }
 

@@ -11,6 +11,7 @@ pub struct FormSection {
     pub title: String,
     pub fields: Vec<FormField>,
     pub active_field: Option<usize>,
+    pub text_editing: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -79,7 +80,13 @@ pub fn render_form_section(frame: &mut Frame, area: Rect, section: &FormSection)
     for (area_index, index) in (start..end).enumerate() {
         let field = &section.fields[index];
         let is_active = section.active_field == Some(index);
-        render_field(frame, field_areas[area_index], field, is_active);
+        render_field(
+            frame,
+            field_areas[area_index],
+            field,
+            is_active,
+            section.text_editing,
+        );
     }
 }
 
@@ -110,7 +117,13 @@ fn visible_field_range(heights: &[u16], available_height: u16, active: usize) ->
     (start, end)
 }
 
-fn render_field(frame: &mut Frame, area: Rect, field: &FormField, is_active: bool) {
+fn render_field(
+    frame: &mut Frame,
+    area: Rect,
+    field: &FormField,
+    is_active: bool,
+    text_editing: bool,
+) {
     let layout = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
@@ -119,7 +132,7 @@ fn render_field(frame: &mut Frame, area: Rect, field: &FormField, is_active: boo
         ])
         .split(area);
 
-    let title = field_title(field, is_active);
+    let title = field_title(field, is_active, text_editing);
     let block = Block::default()
         .borders(Borders::ALL)
         .title(title)
@@ -137,7 +150,7 @@ fn render_field(frame: &mut Frame, area: Rect, field: &FormField, is_active: boo
     .block(block);
     frame.render_widget(value, layout[0]);
 
-    if is_active && field.role == FormFieldRole::Text {
+    if is_active && field.role == FormFieldRole::Text && text_editing {
         let cursor_x = input_area
             .x
             .saturating_add(cursor_offset.min(input_area.width.saturating_sub(1)));
@@ -155,7 +168,7 @@ fn render_field(frame: &mut Frame, area: Rect, field: &FormField, is_active: boo
     }
 }
 
-fn field_title(field: &FormField, is_active: bool) -> Line<'static> {
+fn field_title(field: &FormField, is_active: bool, text_editing: bool) -> Line<'static> {
     let role = match field.role {
         FormFieldRole::Text => "input",
         FormFieldRole::Choice => "choice",
@@ -164,7 +177,7 @@ fn field_title(field: &FormField, is_active: bool) -> Line<'static> {
     };
 
     let marker = if is_active { ">> " } else { "" };
-    let editing = if is_active && field.role == FormFieldRole::Text {
+    let editing = if is_active && field.role == FormFieldRole::Text && text_editing {
         " <editing>"
     } else if is_active {
         " <selected>"

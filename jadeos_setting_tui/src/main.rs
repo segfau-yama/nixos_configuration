@@ -1,18 +1,20 @@
 mod app;
 mod components;
 mod config;
+mod event;
 mod infra;
 mod logic;
 mod ui;
+mod update;
 
 use std::io;
 
 use app::App;
 use crossterm::{
-    event::{self, Event},
     execute,
     terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
+use event::read_key_event;
 use ratatui::{Terminal, backend::CrosstermBackend};
 
 fn main() -> io::Result<()> {
@@ -28,7 +30,7 @@ fn run(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>) -> io::Result<()> 
     while !app.should_quit {
         terminal.draw(|frame| ui::render(frame, &app))?;
 
-        if let Event::Key(key) = event::read()? {
+        if let Some(key) = read_key_event()? {
             app.handle_key(key);
         }
     }
