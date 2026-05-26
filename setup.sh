@@ -292,9 +292,16 @@ detect_hardware() {
   gpu_info=$(lspci 2>/dev/null | grep -iE 'VGA|3D|Display' || echo "")
 
   # -- VM / paravirtual GPUs (checked FIRST to prevent false AMD/Intel matches)
-  # QXL, Virtio GPU, VMware SVGA, VirtualBox, Bochs VBE -- all need GPU_TYPE=none.
-  if echo "$gpu_info" | grep -qiE \
-       "QXL|Virtio.GPU|VMware.SVGA|VirtualBox.Graphics|Bochs|SVGA.II|paravirtual|Red Hat.*VGA"; then
+  # Virtio GPU は専用タイプ virtio として扱う。
+  if echo "$gpu_info" | grep -qiE "Virtio.*GPU|virtio.*gpu|virtio.*vga"; then
+    GPU_TYPE="virtio"
+    GPU_BRAND=$(echo "$gpu_info" | head -1 \
+      | sed -E 's/^[0-9a-f:.]+[[:space:]]+(VGA compatible controller|3D controller|Display controller):[[:space:]]*//' \
+      | xargs)
+    [[ -z "$GPU_BRAND" ]] && GPU_BRAND="Virtio GPU"
+  # QXL, VMware SVGA, VirtualBox, Bochs VBE は none として扱う。
+  elif echo "$gpu_info" | grep -qiE \
+       "QXL|VMware.SVGA|VirtualBox.Graphics|Bochs|SVGA.II|paravirtual|Red Hat.*VGA"; then
     GPU_TYPE="none"
     GPU_BRAND=$(echo "$gpu_info" | head -1 \
       | sed -E 's/^[0-9a-f:.]+[[:space:]]+(VGA compatible controller|3D controller|Display controller):[[:space:]]*//' \
@@ -543,7 +550,7 @@ phase1_pc_config() {
   step "GPU Configuration"
   echo -e "  Detected GPU: ${BOLD}${GPU_BRAND}${RESET} (${GPU_TYPE})"
   echo
-  local gpu_opts=("nvidia:NVIDIA proprietary driver" "amd:AMD open-source driver" "intel:Intel modesetting driver" "none:Virtual Machine / basic Mesa graphics")
+  local gpu_opts=("nvidia:NVIDIA proprietary driver" "amd:AMD open-source driver" "intel:Intel modesetting driver" "virtio:Virtio GPU (QEMU/KVM)" "none:Virtual Machine / basic Mesa graphics")
   i=1
   for opt in "${gpu_opts[@]}"; do
     local key="${opt%%:*}"
@@ -555,12 +562,13 @@ phase1_pc_config() {
     fi
     (( i++ ))
   done
-  read -rp "  Select [1-4] (Enter to use detected value): " sel
+  read -rp "  Select [1-5] (Enter to use detected value): " sel
   case "$sel" in
     1) GPU_TYPE="nvidia" ;;
     2) GPU_TYPE="amd" ;;
     3) GPU_TYPE="intel" ;;
-    4) GPU_TYPE="none" ;;
+    4) GPU_TYPE="virtio" ;;
+    5) GPU_TYPE="none" ;;
     "") : ;; # keep detected value
   esac
   success "GPU: ${GPU_TYPE}"

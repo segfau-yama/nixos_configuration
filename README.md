@@ -130,7 +130,7 @@ GPU と CPU の種類はホスト設定（`modules/hosts/<hostname>/configuratio
 環境変数や `--impure` フラグは不要です。
 
 ```nix
-my.hardware.gpu = "nvidia";  # "nvidia" | "amd" | "intel" | "none"
+my.hardware.gpu = "nvidia";  # "nvidia" | "amd" | "intel" | "virtio" | "none"
 my.hardware.cpu = "amd";     # "intel"  | "amd" | "aarch64"
 ```
 
@@ -141,9 +141,10 @@ my.hardware.cpu = "amd";     # "intel"  | "amd" | "aarch64"
 | `nvidia` | nvidia proprietary driver・modesetting・Vulkan・nvtop |
 | `amd` | amdgpu driver・Mesa・Vulkan |
 | `intel` | modesetting・intel-media-driver・OpenCL・Vulkan |
+| `virtio` | Virtio GPU (VM)・modesetting・virtio_gpu・Mesa・QEMU Guest Agent・SPICE Agent |
 | `none` | VM / 汎用 Mesa・QEMU Guest Agent・SPICE Agent |
 
-GPU が `none` 以外のとき、x86_64 環境では `hardware.graphics.enable32Bit`・Steam・Gamemode も自動で有効になります。
+GPU が `nvidia` / `amd` / `intel` のとき、x86_64 環境では `hardware.graphics.enable32Bit`・Steam・Gamemode も自動で有効になります。
 
 ---
 
@@ -290,7 +291,7 @@ rm -f /mnt/etc/nixos/nixos/${HOSTNAME}/configuration.nix  # flake では不要
     ] ++ [ "${inputs.self}/nixos/mypc/hardware-configuration.nix" ];
 
     networking.hostName = "mypc";
-    my.hardware.gpu = lib.mkDefault "nvidia";  # "nvidia" | "amd" | "intel" | "none"
+    my.hardware.gpu = lib.mkDefault "nvidia";  # "nvidia" | "amd" | "intel" | "virtio" | "none"
     my.hardware.cpu = lib.mkDefault "amd";     # "intel"  | "amd"
   };
 }
@@ -356,11 +357,11 @@ mkfs.ext4 -L nixos -F /dev/vda2
 mkswap -L swap /dev/vda3
 ```
 
-ホスト設定では GPU を `"none"` に設定すると、NVIDIA/AMD/Intel 固有ドライバーは使わず、VM 向けの汎用 Mesa/DRI と QEMU Guest Agent / SPICE Agent を有効化します。
+ホスト設定では GPU を `"virtio"`（推奨）または `"none"` に設定すると、VM 向け設定を有効化できます。`"virtio"` は `modesetting` / `virtio_gpu` を明示し、`"none"` は汎用 Mesa 構成として扱います。
 
 ```bash
-# VM 向けホスト設定での例
-my.hardware.gpu = lib.mkDefault "none";
+# VM 向けホスト設定での例（virtio 推奨）
+my.hardware.gpu = lib.mkDefault "virtio";
 my.hardware.cpu = lib.mkDefault "amd";
 ```
 

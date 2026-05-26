@@ -5,13 +5,17 @@
   # ドライバー・マイクロコード・ストレージツールを自動適用する。
   #
   # 使い方 (ホスト設定内で):
-  #   my.hardware.gpu = "nvidia";   # "nvidia" | "amd" | "intel" | "none"
+  #   my.hardware.gpu = "nvidia";   # "nvidia" | "amd" | "intel" | "virtio" | "none"
   #   my.hardware.cpu = "amd";      # "intel"  | "amd" | "aarch64"
-  flake.modules.nixos.hardware = { lib, config, pkgs, ... }: {
+  flake.modules.nixos.hardware = { lib, config, pkgs, ... }:
+  let
+    hasPhysicalGpu = builtins.elem config.my.hardware.gpu [ "nvidia" "amd" "intel" ];
+  in
+  {
 
     options.my.hardware = {
       gpu = lib.mkOption {
-        type        = lib.types.enum [ "nvidia" "amd" "intel" "none" ];
+        type        = lib.types.enum [ "nvidia" "amd" "intel" "virtio" "none" ];
         default     = "none";
         description = "GPU の種類。ドライバーと関連パッケージを自動適用する。";
       };
@@ -25,10 +29,25 @@
     config = lib.mkMerge [
 
       # ── 共通: GUI / Wayland 用の Mesa/DRI 基盤 ────────────────────────────
-      # VM の QXL/Virtio GPU は my.hardware.gpu = "none" として扱うが、
+      # VM の汎用GPU (none) でも Wayland 動作用の Mesa/DRI を有効化する。
       # Niri などの Wayland コンポジターには Mesa/DRI が必要。
       (lib.mkIf (config.my.hardware.gpu == "none") {
         hardware.graphics.enable = true;
+
+        environment.systemPackages = with pkgs; [
+          mesa
+          vulkan-tools
+        ];
+
+        services.qemuGuest.enable = lib.mkDefault true;
+        services.spice-vdagentd.enable = lib.mkDefault true;
+      })
+
+      # ── Virtio GPU (VM) ───────────────────────────────────────────────────
+      (lib.mkIf (config.my.hardware.gpu == "virtio") {
+        hardware.graphics.enable = true;
+        services.xserver.videoDrivers = [ "modesetting" ];
+        boot.initrd.kernelModules = [ "virtio_gpu" ];
 
         environment.systemPackages = with pkgs; [
           mesa
@@ -44,9 +63,9 @@
         hardware.graphics.enable = true;
       })
 
-      # ── 共通: GPU あり + x86_64 → 32bit OpenGL + Gaming を有効化 ──────────
+      # ── 共通: 物理 GPU あり + x86_64 → 32bit OpenGL + Gaming を有効化 ─────
       # enable32Bit / Steam は x86_64 専用（ARM では非対応）。
-      (lib.mkIf (config.my.hardware.gpu != "none" && pkgs.stdenv.hostPlatform.isx86_64) {
+      (lib.mkIf (hasPhysicalGpu && pkgs.stdenv.hostPlatform.isx86_64) {
         hardware.graphics.enable32Bit = true; # Steam / Wine / Proton 向け 32bit 対応
 
         programs.gamemode.enable = true;
