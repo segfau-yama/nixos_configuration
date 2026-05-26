@@ -55,8 +55,7 @@ nixos_configuration/
     │   │   ├── system-base/     # ブート・ネットワーク・Nix 設定・GC
     │   │   ├── locale/          # 日本語ロケール・フォント
     │   │   ├── fcitx5/          # 日本語入力（fcitx5-mozc）
-    │   │   ├── audio/           # PipeWire + ALSA/JACK/PulseAudio
-    │   │   └── storage/         # 非ブートドライブ自動マウント・/nix 配置
+    │   │   └── audio/           # PipeWire + ALSA/JACK/PulseAudio
     │   │
     │   ├── gui/
     │   │   ├── desktop/         # Niri・greetd・XDG Portal・IronBar (NixOS + HM)
@@ -78,7 +77,7 @@ nixos_configuration/
     │   ├── jade/
     │   │   └── jade.nix         # メインユーザー（GUI フルセット）
     │   └── admin/
-    │       └── nixos.nix        # 管理者ユーザー
+    │       └── admin.nix        # 管理者ユーザー
     │
     ├── devshell.nix             # nix develop 用シェル（nixd・alejandra）
     └── flake-parts.nix          # flake-parts modules エクストラのインポート
@@ -93,13 +92,12 @@ nixos_configuration/
 | モジュール名 | 役割 |
 |---|---|
 | `system-base` | ブート・NM・Nix GC・stateVersion・unstable overlay |
-| `hardware` | GPU/CPU ドライバー・マイクロコード（`my.hardware.*` オプション） |
+| `hardware` | GPU/CPU ドライバー・マイクロコード・nix-auto-storage（`my.hardware.*` オプション） |
 | `home-manager` | Home Manager NixOS 統合 |
 | `locale` | 日本語ロケール・フォント・コンソールキーマップ |
 | `fcitx5` | fcitx5-mozc・Wayland 環境変数 |
 | `audio` | PipeWire・rtkit・ALSA/JACK/PulseAudio 互換 |
 | `desktop` | Niri・greetd・polkit・seatd・XDG Portal・IronBar |
-| `storage` | 非ブートドライブ自動マウント・最大容量ドライブへ /nix 配置 |
 | `programming` | nix-ld（パッチなし ELF バイナリ実行） |
 | `jade` | jade ユーザー定義 + HM 統合 |
 | `admin` | admin ユーザー定義 |
@@ -132,9 +130,10 @@ GPU と CPU の種類はホスト設定（`modules/hosts/<hostname>/configuratio
 ```nix
 my.hardware.gpu = "nvidia";  # "nvidia" | "amd" | "intel" | "virtio" | "none"
 my.hardware.cpu = "amd";     # "intel"  | "amd" | "aarch64"
+my.hardware.storage.enable = false;
 ```
 
-`hardware` モジュールが宣言値に応じてドライバー・マイクロコード・Vulkan ツール・btrfs-progs を自動適用します。
+`hardware` モジュールが宣言値に応じてドライバー・マイクロコード・Vulkan ツール・btrfs-progs・nix-auto-storage を自動適用します。
 
 | GPU 値 | 適用される設定 |
 |---|---|
@@ -145,6 +144,8 @@ my.hardware.cpu = "amd";     # "intel"  | "amd" | "aarch64"
 | `none` | VM / 汎用 Mesa・QEMU Guest Agent・SPICE Agent |
 
 GPU が `nvidia` / `amd` / `intel` のとき、x86_64 環境では `hardware.graphics.enable32Bit`・Steam・Gamemode も自動で有効になります。
+
+`my.hardware.storage.enable = true;` のとき、非ブートドライブを自動マウントし、最大容量ドライブへ `/nix` を配置する `nix-auto-storage` を有効化します。
 
 ---
 
@@ -293,6 +294,7 @@ rm -f /mnt/etc/nixos/nixos/${HOSTNAME}/configuration.nix  # flake では不要
     networking.hostName = "mypc";
     my.hardware.gpu = lib.mkDefault "nvidia";  # "nvidia" | "amd" | "intel" | "virtio" | "none"
     my.hardware.cpu = lib.mkDefault "amd";     # "intel"  | "amd"
+    my.hardware.storage.enable = false;
   };
 }
 ```
@@ -397,6 +399,7 @@ passwd admin  # 必要に応じて
 | 変更内容 | ファイル |
 |---|---|
 | GPU/CPU ドライバー設定 | `modules/hardware/hardware.nix` |
+| nix-auto-storage 設定 | `modules/hardware/hardware.nix` |
 | ホスト固有設定（GPU 種別等） | `modules/hosts/<hostname>/configuration.nix` |
 | システム基盤（Nix・GC・ブート） | `modules/software/base/system-base/system-base.nix` |
 | 日本語ロケール・フォント | `modules/software/base/locale/locale.nix` |

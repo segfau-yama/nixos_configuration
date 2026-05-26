@@ -176,7 +176,7 @@ declare -A PRESET_KIND=(
 )
 declare -A PRESET_MODULE_FILE=(
   [jade]="modules/users/jade/jade.nix"
-  [admin]="modules/users/admin/nixos.nix"
+  [admin]="modules/users/admin/admin.nix"
 )
 HAS_GUI_USER=false
 NEEDS_PROGRAMMING_CLI=false
@@ -972,9 +972,6 @@ generate_host_config() {
     imports_lines+=$'\n'"      home-manager  # Home Manager integration"
     imports_lines+=$'\n'"      locale        # locale / fonts"
   fi
-  if [[ "$STORAGE_ENABLED" == "true" ]]; then
-    imports_lines+=$'\n'"      storage"
-  fi
   if [[ "$NEEDS_PROGRAMMING_CLI" == "true" ]]; then
     imports_lines+=$'\n'"      programming   # nix-ld (run unpatched ELF binaries)"
   fi
@@ -1024,6 +1021,7 @@ ${imports_lines}
     # Hardware
     my.hardware.gpu = lib.mkDefault "${GPU_TYPE}";
     my.hardware.cpu = lib.mkDefault "${CPU_TYPE}";
+    my.hardware.storage.enable = ${STORAGE_ENABLED};
 
     # Timezone
     time.timeZone = "${TIMEZONE}";
@@ -1140,7 +1138,7 @@ generate_cui_user_with_hm_nix() {
   local target_dir="${MOUNT_ROOT}/etc/nixos/modules/users/${uname}"
   mkdir -p "$target_dir"
 
-  cat > "${target_dir}/nixos.nix" <<EOF
+  cat > "${target_dir}/${uname}.nix" <<EOF
 { inputs, ... }:
 let
   username = "${uname}";
@@ -1181,7 +1179,7 @@ in
 }
 EOF
 
-  success "Generated CUI user config: modules/users/${uname}/nixos.nix"
+  success "Generated CUI user config: modules/users/${uname}/${uname}.nix"
 }
 
 # -----------------------------------------------------------------------------
@@ -1194,7 +1192,7 @@ generate_cui_user_minimal_nix() {
   local target_dir="${MOUNT_ROOT}/etc/nixos/modules/users/${uname}"
   mkdir -p "$target_dir"
 
-  cat > "${target_dir}/nixos.nix" <<EOF
+  cat > "${target_dir}/${uname}.nix" <<EOF
 { ... }:
 let
   username = "${uname}";
@@ -1218,7 +1216,7 @@ in
 }
 EOF
 
-  success "Generated CUI user config: modules/users/${uname}/nixos.nix"
+  success "Generated CUI user config: modules/users/${uname}/${uname}.nix"
 }
 
 # -----------------------------------------------------------------------------
