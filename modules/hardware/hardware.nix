@@ -27,6 +27,21 @@
       storage.enable = lib.mkEnableOption "non-boot drive auto mount and /nix placement";
     };
 
+    options.my.installDisk = {
+      boot = lib.mkOption {
+        type = lib.types.str;
+        description = "EFI system partition device used by hardware-configuration.nix.";
+      };
+      root = lib.mkOption {
+        type = lib.types.str;
+        description = "Root partition device used by hardware-configuration.nix.";
+      };
+      swap = lib.mkOption {
+        type = lib.types.str;
+        description = "Swap partition device used by hardware-configuration.nix.";
+      };
+    };
+
     config = lib.mkMerge [
 
       # ── 共通: GUI / Wayland 用の Mesa/DRI 基盤 ────────────────────────────

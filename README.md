@@ -28,17 +28,19 @@ nixos_configuration/
 │
 ├── flake.nix                    # flake 定義（import-tree で modules/ を自動インポート）
 ├── flake.lock
-├── setup.sh                     # 対話型インストーラー
+├── setup.sh                     # flake profile 指定型インストーラー
 │
 ├── nixos/
 │   └── <hostname>/
-│       └── hardware-configuration.nix   # setup.sh が nixos-generate-config で生成
+│       ├── hardware-configuration.nix   # profile ごとのハードウェア設定
+│       ├── generated-hardware-configuration.nix # setup.sh が検出したハードウェア設定（必要時）
+│       └── install-args.nix             # setup.sh が生成するインストール入力（必要時）
 │
 └── modules/
     ├── hardware/
     │   └── hardware.nix         # GPU/CPU ハードウェア抽象化
     │
-    ├── hosts/                   # PC ごとのホスト設定（setup.sh が生成）
+    ├── hosts/                   # PC ごとのホスト設定
     │   └── <hostname>/
     │       ├── configuration.nix
     │       └── flake-parts.nix
@@ -51,11 +53,7 @@ nixos_configuration/
     │       └── home-manager.nix # Home Manager NixOS 統合
     │
     ├── software/
-    │   ├── base/
-    │   │   ├── system-base/     # ブート・ネットワーク・Nix 設定・GC
-    │   │   ├── locale/          # 日本語ロケール・フォント
-    │   │   ├── fcitx5/          # 日本語入力（fcitx5-mozc）
-    │   │   └── audio/           # PipeWire + ALSA/JACK/PulseAudio
+    │   ├── base.nix             # 共通基盤（Nix設定・locale・fcitx5・audio）
     │   │
     │   ├── gui/
     │   │   ├── desktop/         # Niri・greetd・XDG Portal・IronBar (NixOS + HM)
@@ -91,12 +89,9 @@ nixos_configuration/
 
 | モジュール名 | 役割 |
 |---|---|
-| `system-base` | ブート・NM・Nix GC・stateVersion・unstable overlay |
+| `base` | ブート・NM・Nix GC・stateVersion・unstable overlay・locale・fcitx5・audio |
 | `hardware` | GPU/CPU ドライバー・マイクロコード・nix-auto-storage（`my.hardware.*` オプション） |
 | `home-manager` | Home Manager NixOS 統合 |
-| `locale` | 日本語ロケール・フォント・コンソールキーマップ |
-| `fcitx5` | fcitx5-mozc・Wayland 環境変数 |
-| `audio` | PipeWire・rtkit・ALSA/JACK/PulseAudio 互換 |
 | `desktop` | Niri・greetd・polkit・seatd・XDG Portal・IronBar |
 | `programming` | nix-ld（パッチなし ELF バイナリ実行） |
 | `jade` | jade ユーザー定義 + HM 統合 |
@@ -149,29 +144,21 @@ GPU が `nvidia` / `amd` / `intel` のとき、x86_64 環境では `hardware.gra
 
 ---
 
-## 新規インストール（自動: setup.sh 推奨）
+## 新規インストール（setup.sh）
 
-`setup.sh` は対話型の 3 フェーズインストーラーです。
+`setup.sh` は、リポジトリに定義済みの flake profile を選んで `nixos-install` するための薄いインストーラーです。  
+Nix 設定本体は生成せず、インストール時のパーティション入力だけを `nixos/<profile>/install-args.nix` として渡します。
 
 ### ネットワークから取得して実行
 
 NixOS ライブ環境（インストール ISO 起動直後）では、まずネットワーク経由で `setup.sh` を取得します。
 
 ```bash
-# ネットワーク接続を確認
-ping -c 1 github.com
-
-# curl で取得して実行（推奨）
 curl -fsSL https://raw.githubusercontent.com/segfau-yama/nixos_configuration/main/setup.sh -o setup.sh
+vi setup.sh
 sudo bash setup.sh
 ```
 
-`curl` が使えない場合は `wget` を使用します。
-
-```bash
-wget -O setup.sh https://raw.githubusercontent.com/segfau-yama/nixos_configuration/main/setup.sh
-sudo bash setup.sh
-```
 
 > **Wi-Fi の場合**  
 > NixOS ライブ環境では `wpa_supplicant` または `nmtui` で接続してから実行してください。
@@ -183,151 +170,29 @@ sudo bash setup.sh
 > wpa_cli -i wlan0 scan_results
 > ```
 
-### フェーズ 1: PC 設定
+`setup.sh` 冒頭の設定ブロックを編集してから実行します。
 
-- ハードウェア自動検出（CPU・GPU・メモリ・ディスク一覧）
-- インストール先デバイス・パーティションサイズの選択
-- キーボードレイアウト・ロケール・タイムゾーンの選択
-- SSH・nix-auto-storage・GPU/CPU の設定
+```bash
+PROFILE="virtual_machine"
+TARGET_DISK="/dev/vda"
+BOOT_PART=""      # 空なら TARGET_DISK から推定
+ROOT_PART=""      # 空なら TARGET_DISK から推定
+SWAP_PART=""      # 空なら TARGET_DISK から推定
+MOUNT_ROOT="/mnt"
+BOOT_END="512MiB"
+ROOT_END="100GiB"
+YES=true          # 実行前に true へ変更
+DRY_RUN=false
+```
 
-### フェーズ 2: ユーザー設定
+動作確認だけしたい場合は、`DRY_RUN=true` に変更します。この場合、`install-args.nix` も作成されません。
 
-- デフォルトユーザー `jade`（GUI フルセット）と `admin`（管理者）の選択
-- カスタムユーザーの追加（ユーザー名・説明・GUI/CUI 種別・プログラムセット選択）
-  - **GUI ユーザー**: desktop・browser・gaming 等の GUI モジュールを選択可能
-  - **CUI ユーザー**: programming・lang・nix-tools・cli-tools のみ選択可能
-
-### フェーズ 3: インストール
-
+このスクリプトが行うこと:
 1. GPT パーティション作成・フォーマット・マウント
-2. リポジトリを `/mnt/etc/nixos` に clone
-3. `nixos-generate-config` でハードウェア設定を `nixos/<hostname>/` に生成
-4. ホスト設定ファイルを `modules/hosts/<hostname>/` に生成
-5. カスタムユーザー設定を `modules/users/<username>/` に生成
-6. `git add .` で全ファイルを追跡
-7. `nixos-install --flake /mnt/etc/nixos#<hostname>` を実行
-
----
-
-## 新規インストール（手動）
-
-`setup.sh` を使わず手動でセットアップする場合の手順です。  
-以下は UEFI 前提で、`/dev/nvme0n1` を例として使用します。
-
-> **root シェルに切り替えておくと便利です（推奨）**
-> ```bash
-> sudo -i
-> ```
-
-### 1. NixOS インストーラで起動
-
-- NixOS インストールメディアで起動
-- ネットワーク接続を確認
-
-### 2. ディスクを作成
-
-```bash
-lsblk -f   # デバイス名を確認
-
-parted -s /dev/nvme0n1 mklabel gpt
-parted -s /dev/nvme0n1 mkpart ESP fat32 1MiB 1GiB
-parted -s /dev/nvme0n1 set 1 esp on
-parted -s /dev/nvme0n1 mkpart nixos ext4 1GiB 57GiB
-parted -s /dev/nvme0n1 mkpart swap linux-swap 57GiB 100%
-
-mkfs.fat -F 32 -n boot /dev/nvme0n1p1
-mkfs.ext4 -L nixos -F /dev/nvme0n1p2
-mkswap -L swap /dev/nvme0n1p3
-```
-
-### 3. マウント
-
-```bash
-mount /dev/disk/by-label/nixos /mnt
-mkdir -p /mnt/boot
-mount /dev/disk/by-label/boot /mnt/boot
-swapon /dev/disk/by-label/swap
-```
-
-### 4. リポジトリを配置
-
-```bash
-mkdir -p /mnt/etc/nixos
-cd /mnt/etc/nixos
-git init
-git remote add origin https://github.com/segfau-yama/nixos_configuration.git
-git fetch origin
-git checkout -t origin/main
-```
-
-### 5. ハードウェア設定を生成
-
-ホスト名（例: `mypc`）のディレクトリに `hardware-configuration.nix` を生成します。
-
-```bash
-HOSTNAME=mypc
-mkdir -p nixos/${HOSTNAME}
-nixos-generate-config --root /mnt --dir /mnt/etc/nixos/nixos/${HOSTNAME}
-rm -f /mnt/etc/nixos/nixos/${HOSTNAME}/configuration.nix  # flake では不要
-```
-
-### 6. ホスト設定ファイルを作成
-
-`modules/hosts/<hostname>/` に2ファイルを作成します。
-
-**`modules/hosts/mypc/configuration.nix`**:
-```nix
-{ inputs, ... }:
-{
-  flake.modules.nixos.mypc = { lib, ... }: {
-    imports = with inputs.self.modules.nixos; [
-      system-base
-      home-manager
-      locale
-      fcitx5
-      audio
-      desktop
-      jade      # または任意のユーザーモジュール
-      admin
-    ] ++ [ "${inputs.self}/nixos/mypc/hardware-configuration.nix" ];
-
-    networking.hostName = "mypc";
-    my.hardware.gpu = lib.mkDefault "nvidia";  # "nvidia" | "amd" | "intel" | "virtio" | "none"
-    my.hardware.cpu = lib.mkDefault "amd";     # "intel"  | "amd"
-    my.hardware.storage.enable = false;
-  };
-}
-```
-
-**`modules/hosts/mypc/flake-parts.nix`**:
-```nix
-{ inputs, ... }:
-{
-  flake.nixosConfigurations = inputs.self.lib.mkNixos "x86_64-linux" "mypc";
-}
-```
-
-### 7. flake 用にファイルを追跡
-
-flake は Git 追跡ファイルのみを参照するため、新規ファイルはすべて `git add` が必要です。
-
-```bash
-git add .
-```
-
-### 8. インストール実行
-
-```bash
-nixos-install --flake /mnt/etc/nixos#mypc
-```
-
-インストール後に再起動:
-
-```bash
-reboot
-```
-
----
+2. リポジトリを `/mnt/etc/nixos` に配置
+3. `nixos/<profile>/install-args.nix` に boot/root/swap の割り当てを書き出し、flake 評価に含める
+4. `nixos-generate-config --show-hardware-config` の結果を `nixos/<profile>/generated-hardware-configuration.nix` に書き出す
+5. `nixos-install --flake /mnt/etc/nixos#<profile>` を実行
 
 ## 仮想マシンへのインストール
 
@@ -358,6 +223,30 @@ mkfs.fat -F 32 -n boot /dev/vda1
 mkfs.ext4 -L nixos -F /dev/vda2
 mkswap -L swap /dev/vda3
 ```
+
+#### 安全寄り簡易インストールスクリプト（再パーティションなし）
+
+既存パーティションをそのまま使ってインストールだけを行う場合は、以下の手順でスクリプトをダウンロードして実行します。
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/segfau-yama/nixos_configuration/main/scripts/install-virtual-machine.sh -o install-virtual-machine.sh
+chmod +x install-virtual-machine.sh
+sudo ./install-virtual-machine.sh
+```
+
+このスクリプトは次を行います:
+- `/dev/vda2` を `/mnt` にマウント
+- `/dev/vda1` を `/mnt/boot` にマウント
+- `/dev/vda3` を `swapon`
+- `/mnt/etc/nixos#virtual_machine` で `nixos-install`
+
+このスクリプトは**再パーティション・再フォーマットを行いません**。  
+事前に以下が成立している必要があります:
+- `/dev/vda1` が `vfat`
+- `/dev/vda2` が `ext4`
+- `/dev/vda3` が `swap`
+- [hardware-configuration.nix](/workspaces/nixos_configuration/nixos/virtual_machine/hardware-configuration.nix) の `/dev/vda*` 設定と一致
+- `/mnt/etc/nixos` にこのリポジトリ（`flake.nix` と `.git`）が存在
 
 ホスト設定では GPU を `"virtio"`（推奨）または `"none"` に設定すると、VM 向け設定を有効化できます。`"virtio"` は `modesetting` / `virtio_gpu` を明示し、`"none"` は汎用 Mesa 構成として扱います。
 
@@ -401,10 +290,7 @@ passwd admin  # 必要に応じて
 | GPU/CPU ドライバー設定 | `modules/hardware/hardware.nix` |
 | nix-auto-storage 設定 | `modules/hardware/hardware.nix` |
 | ホスト固有設定（GPU 種別等） | `modules/hosts/<hostname>/configuration.nix` |
-| システム基盤（Nix・GC・ブート） | `modules/software/base/system-base/system-base.nix` |
-| 日本語ロケール・フォント | `modules/software/base/locale/locale.nix` |
-| 日本語入力 | `modules/software/base/fcitx5/fcitx5.nix` |
-| 音声設定 | `modules/software/base/audio/audio.nix` |
+| 共通基盤（Nix・GC・ブート・locale・入力・音声） | `modules/software/base.nix` |
 | Niri・greetd・IronBar | `modules/software/gui/desktop/desktop.nix` |
 | ゲーミング (Lutris/Wine) | `modules/software/gui/gaming/gaming.nix` |
 | 開発ツール（シェル・Direnv） | `modules/software/cui/programming/programming.nix` |
@@ -453,21 +339,11 @@ nixos-rebuild switch --flake /etc/nixos#<hostname>
 
 ---
 
-## 重要世代のマーク
+## 重要世代の保護
 
-`system-base` モジュールに `nixos-mark-generation` コマンドが含まれています。  
-GC root を作成して、自動 GC で誤って削除されないよう世代を保護します。
-
-```bash
-# 現在の世代を baseline として保護
-sudo nixos-mark-generation baseline
-
-# 指定した世代番号を保護
-sudo nixos-mark-generation before-gpu-update 132
-
-# 現在のラベル確認
-ls /nix/var/nix/gcroots/important-generations/
-```
+現在は `nixos-mark-generation` コマンドを同梱していません。  
+重要な世代を保護する場合は、`nix-env --list-generations --profile /nix/var/nix/profiles/system` で世代を確認し、
+必要に応じて手動で GC root を作成してください。
 
 作成された GC root の保存先:
 
@@ -528,7 +404,7 @@ git add modules/software/gui/newapp/newapp.nix
 
 ### nixpkgs stable / unstable の使い分け
 
-`system-base` モジュールが `pkgs.unstable` overlay を設定します。
+`base` モジュールが `pkgs.unstable` overlay を設定します。
 
 | チャンネル | 用途 |
 |---|---|
