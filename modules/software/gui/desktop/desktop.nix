@@ -1,4 +1,4 @@
-{ inputs, ... }:
+{ ... }:
 {
   # desktop (NixOS): Niri Wayland コンポジターに必要な全 NixOS 設定を一箇所に集約する。
   #
@@ -8,35 +8,52 @@
   #   - xdg-desktop-portal (gtk + gnome バックエンド)
   #   - Wayland 基本ツール + ironbar (シェル UI)
   # ユーザーアプリ (spacedrive 等) は homeManager.jade で管理する。
-  flake.modules.nixos.desktop = { config, pkgs, ... }: {
-    imports = [
-      inputs.niri.nixosModules.niri
-    ];
+  flake.modules.nixos.desktop = { config, pkgs, ... }:
+  let
+    niriSession = pkgs.writeShellScript "niri-session-filter-systemd-warning" ''
+      exec ${config.programs.niri.package}/bin/niri-session \
+        2> >(${pkgs.gnugrep}/bin/grep -v "import-environment without a list" >&2)
+    '';
+  in {
 
     # ── Compositor & System Services ────────────────────────────────────────
+    hardware.graphics.enable = true;
+
     programs.niri.enable = true;
+    programs.dconf.enable = true;
 
     services.dbus.enable  = true;
     services.seatd.enable = true;
+    security.polkit.enable = true;
 
     # ── Login Manager: greetd + tuigreet ────────────────────────────────────
     # tuigreet は TUI 上でユーザー選択し、niri-session 経由で systemd user session として niri を起動する。
     services.greetd = {
       enable = true;
       settings.default_session = {
-        command = "${pkgs.greetd.tuigreet}/bin/tuigreet --time --cmd ${config.programs.niri.package}/bin/niri-session";
+        command = "${pkgs.greetd.tuigreet}/bin/tuigreet --time --cmd ${niriSession}";
         user    = "greeter";
       };
     };
 
     # ── XDG Desktop Portal ───────────────────────────────────────────────────
-    # niri-flake が niri 用 portal config と GNOME backend を提供する。
-    # ここではファイル選択などに使う GTK backend だけ追加する。
+    # ポータルバックエンドを2つ用意する:
+    #   gtk   : ファイル選択・URI ハンドリング・その他汎用インターフェイス
+    #   gnome : スクリーンキャスト・スクリーンショット・リモートデスクトップ
+    #           (PipeWire + zwlr_screencopy_v1 経由。Discord/OBS の画面共有に必要)
     xdg.portal = {
+      enable = true;
       xdgOpenUsePortal = true;
       extraPortals = with pkgs; [
         xdg-desktop-portal-gtk    # ファイル選択・URI ハンドリング
+        xdg-desktop-portal-gnome  # スクリーンキャスト・スクリーンショット
       ];
+      config.common = {
+        default = [ "gtk" ];
+        "org.freedesktop.portal.ScreenCast" = [ "gnome" ];
+        "org.freedesktop.portal.Screenshot" = [ "gnome" ];
+        "org.freedesktop.portal.RemoteDesktop" = [ "gnome" ];
+      };
     };
 
     # ── System Packages ──────────────────────────────────────────────────────
@@ -50,6 +67,7 @@
       ironbar       # IronBar ステータスバー (greetd セッション前から起動するため system 側)
       wezterm       # Niri hotkey fallback terminal
       tofi          # Niri hotkey fallback launcher
+      xwayland-satellite # XWayland support for Niri
     ];
   };
 
@@ -106,41 +124,44 @@
     };
 
     # ── Niri config.kdl ──────────────────────────────────────────────────────
-    # niri-flake の構造化設定を使い、ビルド時に config.kdl を検証する。
-    programs.niri.settings = {
-      environment."NIXOS_OZONE_WL" = "1";
+    xdg.configFile."niri/config.kdl".text = ''
+      environment {
+        NIXOS_OZONE_WL "1"
+      }
 
-      input.keyboard.xkb = {
-        layout = "jp";
-        model  = "jp106";
-      };
+      input {
+        keyboard {
+          xkb {
+            layout "jp"
+            model "jp106"
+          }
+        }
+      }
 
-      layout = {
-        gaps = 8;
-        "center-focused-column" = "never";
-      };
+      layout {
+        gaps 8
+        center-focused-column "never"
+      }
 
-      spawn-at-startup = [
-        { argv = [ "fcitx5" "-d" ]; }
-        { argv = [ "ironbar" ]; }
-        { argv = [ "wlsunset" "-l" "35.7" "-L" "139.7" ]; }
-      ];
+      spawn-at-startup "fcitx5" "-d"
+      spawn-at-startup "ironbar"
+      spawn-at-startup "wlsunset" "-l" "35.7" "-L" "139.7"
 
-      binds = {
-        "Mod+Return".action.spawn = "wezterm";
-        "Mod+D".action.spawn = "tofi-drun";
-        "Mod+W".action.spawn = "chromium";
-        "Mod+E".action.spawn = "spacedrive";
-        "Mod+C".action.close-window = [];
-        "Mod+F".action.fullscreen-window = [];
-        "Mod+P".action.spawn = [ "wayshot" "--region" ];
+      binds {
+        Mod+Return { spawn "wezterm"; }
+        Mod+D      { spawn "tofi-drun"; }
+        Mod+W      { spawn "chromium"; }
+        Mod+E      { spawn "spacedrive"; }
+        Mod+C      { close-window; }
+        Mod+F      { fullscreen-window; }
+        Mod+P      { spawn "wayshot" "--region"; }
 
-        "XF86AudioRaiseVolume".action.spawn = [ "wpctl" "set-volume" "-l" "1" "@DEFAULT_AUDIO_SINK@" "5%+" ];
-        "XF86AudioLowerVolume".action.spawn = [ "wpctl" "set-volume" "@DEFAULT_AUDIO_SINK@" "5%-" ];
-        "XF86AudioMute".action.spawn = [ "wpctl" "set-mute" "@DEFAULT_AUDIO_SINK@" "toggle" ];
-        "XF86AudioMicMute".action.spawn = [ "wpctl" "set-mute" "@DEFAULT_AUDIO_SOURCE@" "toggle" ];
-      };
-    };
+        XF86AudioRaiseVolume { spawn "wpctl" "set-volume" "-l" "1" "@DEFAULT_AUDIO_SINK@" "5%+"; }
+        XF86AudioLowerVolume { spawn "wpctl" "set-volume" "@DEFAULT_AUDIO_SINK@" "5%-"; }
+        XF86AudioMute        { spawn "wpctl" "set-mute" "@DEFAULT_AUDIO_SINK@" "toggle"; }
+        XF86AudioMicMute     { spawn "wpctl" "set-mute" "@DEFAULT_AUDIO_SOURCE@" "toggle"; }
+      }
+    '';
 
     # ── IronBar config.json ──────────────────────────────────────────────────
     xdg.configFile."ironbar/config.json".text = ''
