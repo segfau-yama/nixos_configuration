@@ -4,7 +4,7 @@ set -euo pipefail
 REPO_URL="${REPO_URL:-https://github.com/segfau-yama/nixos_configuration.git}"
 
 # Edit this block before running in a minimal CLI environment.
-PROFILE="virtual_machine"
+# PROFILE is selected interactively from modules/hosts at runtime.
 TARGET_DISK="/dev/vda"
 BOOT_PART=""
 ROOT_PART=""
@@ -22,11 +22,11 @@ Usage:
 
 Configuration:
   Edit the variables near the top of setup.sh before running:
-    PROFILE, TARGET_DISK, BOOT_PART, ROOT_PART, SWAP_PART,
+    TARGET_DISK, BOOT_PART, ROOT_PART, SWAP_PART,
     MOUNT_ROOT, BOOT_END, ROOT_END, YES, DRY_RUN.
 
 This script does not generate Nix host or user modules.
-The selected profile must already exist in this repository.
+The install profile is selected interactively from modules/hosts.
 EOF
 }
 
@@ -121,7 +121,70 @@ generate_hardware_config() {
   nixos-generate-config --root "$MOUNT_ROOT" --show-hardware-config > "$path"
 }
 
+discover_profiles() {
+  local -n out_profiles=$1
+  local host_dir
+  local profile
+
+  out_profiles=()
+  while IFS= read -r host_dir; do
+    profile="$(basename "$host_dir")"
+    [[ -n "$profile" ]] || continue
+    [[ "$profile" == ".gitkeep" ]] && continue
+    out_profiles+=("$profile")
+  done < <(find modules/hosts -mindepth 1 -maxdepth 1 -type d | sort)
+
+  ((${#out_profiles[@]} > 0)) || error "No valid hosts found in modules/hosts"
+}
+
+select_profile() {
+  local profiles=()
+  local i
+  local selection=""
+  local max
+
+  discover_profiles profiles
+
+  info "Select install profile:"
+  for i in "${!profiles[@]}"; do
+    printf '  %d) %s\n' "$((i + 1))" "${profiles[$i]}"
+  done
+
+  max="${#profiles[@]}"
+  while true; do
+    read -r -p "Enter number [1-${max}]: " selection
+    if [[ "$selection" =~ ^[0-9]+$ ]] && ((selection >= 1 && selection <= max)); then
+      PROFILE="${profiles[$((selection - 1))]}"
+      return
+    fi
+    info "Invalid selection: $selection"
+  done
+}
+
+auto_start_countdown() {
+  local seconds=5
+  local part_boot="$1"
+  local part_root="$2"
+  local part_swap="$3"
+
+  info "Selected profile: $PROFILE"
+  info "Target disk      : $TARGET_DISK"
+  info "Boot part        : $part_boot"
+  info "Root part        : $part_root"
+  info "Swap part        : $part_swap"
+  info "Auto-starting install in ${seconds}s. Press Ctrl+C to cancel."
+
+  while ((seconds > 0)); do
+    printf '\r[INFO] Starting in %ds... ' "$seconds"
+    sleep 1
+    ((seconds--))
+  done
+  printf '\n'
+}
+
 main() {
+  local PROFILE=""
+
   if [[ $# -gt 0 ]]; then
     case "$1" in
       -h|--help)
@@ -134,7 +197,6 @@ main() {
     esac
   fi
 
-  [[ -n "$PROFILE" ]] || error "--profile is required"
   [[ -n "$TARGET_DISK" ]] || error "--target-disk is required"
 
   if [[ "$YES" != true && "$DRY_RUN" != true ]]; then
@@ -166,6 +228,9 @@ main() {
   part_boot="${BOOT_PART:-$part_boot}"
   part_root="${ROOT_PART:-$part_root}"
   part_swap="${SWAP_PART:-$part_swap}"
+
+  select_profile
+  auto_start_countdown "$part_boot" "$part_root" "$part_swap"
 
   local target_repo="$MOUNT_ROOT/etc/nixos"
   local profile_dir="$target_repo/nixos/$PROFILE"

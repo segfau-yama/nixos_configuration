@@ -8,45 +8,46 @@
   #   - xdg-desktop-portal (gtk + gnome バックエンド)
   #   - Wayland 基本ツール + ironbar (シェル UI)
   # ユーザーアプリ (spacedrive 等) は homeManager.jade で管理する。
-  flake.modules.nixos.desktop = { config, pkgs, ... }:
-  let
-    niriSession = pkgs.writeShellScript "niri-session-filter-systemd-warning" ''
-      exec ${config.programs.niri.package}/bin/niri-session \
-        2> >(${pkgs.gnugrep}/bin/grep -v "import-environment without a list" >&2)
-    '';
-  in {
-
+  flake.modules.nixos.desktop = { config, lib, pkgs, ... }: {
     # ── Compositor & System Services ────────────────────────────────────────
     hardware.graphics.enable = true;
 
     programs.niri.enable = true;
     programs.dconf.enable = true;
 
+    # niri 周辺で必要になりやすい基本サービスを desktop module 側で明示する。
     services.dbus.enable  = true;
     services.seatd.enable = true;
+    services.gnome.gnome-keyring.enable = true;
+
     security.polkit.enable = true;
+    security.pam.services.swaylock = {};
+
+    # Electron/Chromium 系アプリを Wayland 優先で動かす。
+    environment.sessionVariables.NIXOS_OZONE_WL = "1";
 
     # ── Login Manager: greetd + tuigreet ────────────────────────────────────
     # tuigreet は TUI 上でユーザー選択し、niri-session 経由で systemd user session として niri を起動する。
     services.greetd = {
       enable = true;
       settings.default_session = {
-        command = "${pkgs.greetd.tuigreet}/bin/tuigreet --time --cmd ${niriSession}";
+        command = "${pkgs.greetd.tuigreet}/bin/tuigreet --time --cmd ${config.programs.niri.package}/bin/niri-session";
         user    = "greeter";
       };
     };
 
+    # user service が /run/current-system/sw/bin を暗黙に拾わないようにする。
+    systemd.user.services.niri.enableDefaultPath = false;
+
     # ── XDG Desktop Portal ───────────────────────────────────────────────────
-    # ポータルバックエンドを2つ用意する:
-    #   gtk   : ファイル選択・URI ハンドリング・その他汎用インターフェイス
-    #   gnome : スクリーンキャスト・スクリーンショット・リモートデスクトップ
-    #           (PipeWire + zwlr_screencopy_v1 経由。Discord/OBS の画面共有に必要)
+    # niri のスクリーン共有には GNOME portal、ファイル選択には GTK portal を使う。
     xdg.portal = {
       enable = true;
       xdgOpenUsePortal = true;
+      config.niri."org.freedesktop.impl.portal.FileChooser" = lib.mkForce [ "gtk" ];
       extraPortals = with pkgs; [
+        xdg-desktop-portal-gnome  # PipeWire 経由のスクリーン共有
         xdg-desktop-portal-gtk    # ファイル選択・URI ハンドリング
-        xdg-desktop-portal-gnome  # スクリーンキャスト・スクリーンショット
       ];
       config.common = {
         default = [ "gtk" ];
@@ -67,7 +68,9 @@
       ironbar       # IronBar ステータスバー (greetd セッション前から起動するため system 側)
       wezterm       # Niri hotkey fallback terminal
       tofi          # Niri hotkey fallback launcher
-      xwayland-satellite # XWayland support for Niri
+      swayidle      # アイドル制御
+      swaylock      # 画面ロック
+      xwayland-satellite # X11 アプリを niri 上で動かす
     ];
   };
 
@@ -125,15 +128,10 @@
 
     # ── Niri config.kdl ──────────────────────────────────────────────────────
     xdg.configFile."niri/config.kdl".text = ''
-      environment {
-        NIXOS_OZONE_WL "1"
-      }
-
       input {
         keyboard {
           xkb {
-            layout "jp"
-            model "jp106"
+            layout "us"
           }
         }
       }
@@ -143,23 +141,28 @@
         center-focused-column "never"
       }
 
+      environment {
+        NIXOS_OZONE_WL "1"
+      }
+
       spawn-at-startup "fcitx5" "-d"
       spawn-at-startup "ironbar"
       spawn-at-startup "wlsunset" "-l" "35.7" "-L" "139.7"
 
       binds {
         Mod+Return { spawn "wezterm"; }
-        Mod+D      { spawn "tofi-drun"; }
-        Mod+W      { spawn "chromium"; }
-        Mod+E      { spawn "spacedrive"; }
-        Mod+C      { close-window; }
-        Mod+F      { fullscreen-window; }
-        Mod+P      { spawn "wayshot" "--region"; }
+        Mod+D { spawn "tofi-drun"; }
+        Mod+W { spawn "chromium"; }
+        Mod+E { spawn "spacedrive"; }
+        Mod+C { close-window; }
+        Mod+F { fullscreen-window; }
+        Mod+L { spawn "swaylock" "-f" "-c" "1e1e2e"; }
+        Mod+P { spawn "wayshot" "--region"; }
 
         XF86AudioRaiseVolume { spawn "wpctl" "set-volume" "-l" "1" "@DEFAULT_AUDIO_SINK@" "5%+"; }
         XF86AudioLowerVolume { spawn "wpctl" "set-volume" "@DEFAULT_AUDIO_SINK@" "5%-"; }
-        XF86AudioMute        { spawn "wpctl" "set-mute" "@DEFAULT_AUDIO_SINK@" "toggle"; }
-        XF86AudioMicMute     { spawn "wpctl" "set-mute" "@DEFAULT_AUDIO_SOURCE@" "toggle"; }
+        XF86AudioMute { spawn "wpctl" "set-mute" "@DEFAULT_AUDIO_SINK@" "toggle"; }
+        XF86AudioMicMute { spawn "wpctl" "set-mute" "@DEFAULT_AUDIO_SOURCE@" "toggle"; }
       }
     '';
 

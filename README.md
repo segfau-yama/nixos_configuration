@@ -170,10 +170,10 @@ sudo bash setup.sh
 > wpa_cli -i wlan0 scan_results
 > ```
 
-`setup.sh` 冒頭の設定ブロックを編集してから実行します。
+`setup.sh` 冒頭の設定ブロックを編集してから実行します。  
+`PROFILE` は編集不要で、実行中に `modules/hosts` から選択します（選択後 5 秒で自動開始、`Ctrl+C` で中断可能）。
 
 ```bash
-PROFILE="virtual_machine"
 TARGET_DISK="/dev/vda"
 BOOT_PART=""      # 空なら TARGET_DISK から推定
 ROOT_PART=""      # 空なら TARGET_DISK から推定
@@ -198,6 +198,41 @@ DRY_RUN=false
 
 QEMU/KVM などの VM にインストールする場合の補足です。  
 ここでは 20GiB の `/dev/vda` を例として使用します。
+
+### ホスト側からコピー＆ペーストする
+
+VM のコンソール画面へ直接貼り付けるのではなく、NixOS live 環境へ SSH で入ると、ホスト側ターミナルのコピー＆ペーストをそのまま使えます。
+
+VM の NixOS live 環境で、短いパスワードを一時設定して SSH を起動します。
+
+```bash
+passwd nixos
+sudo systemctl start sshd
+ip -brief addr
+```
+
+ホスト側で VM の IP アドレスへ SSH 接続します。
+
+```bash
+ssh nixos@<VM-IP>
+sudo -i
+```
+
+以降はホスト側ターミナルからコマンドを貼り付けて作業できます。たとえば `setup.sh` を使う場合:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/segfau-yama/nixos_configuration/main/setup.sh -o setup.sh
+vi setup.sh
+bash setup.sh
+```
+
+NixOS live ISO の起動オプションに `live.nixos.passwd=<password>` を追加して、最初から `nixos` ユーザーのパスワードを設定する方法もあります。
+
+VM が NAT でホストから直接到達できない場合は、VM 側の SSH port 22 をホスト側へポートフォワードしてください。
+
+```bash
+ssh -p 2222 nixos@127.0.0.1
+```
 
 > **UEFI 起動を有効にしてください**
 > この設定は `systemd-boot` を使用します。
@@ -260,6 +295,127 @@ my.hardware.cpu = lib.mkDefault "amd";
 > - Niri の描画: QEMU/KVM で Virgil3D を有効にすると GPU アクセラレーションが利きます（設定は別途必要）
 > - `NetworkManager-wait-online.service` が起動を遅延させる場合は `systemd.services.NetworkManager-wait-online.enable = false;` を追加してください
 > - QEMU Guest Agent が必要な場合は `services.qemuGuest.enable = true;` を追加してください
+
+---
+
+## フォールバック: 動作済み NixOS から作り直す
+
+このプロジェクトのビルドエラーが解消できない場合は、いったん GUI Installer で NixOS を通常インストールし、動作済みの `/etc/nixos` を正として別プロジェクトを作る方針に切り替えます。
+
+このルートの目的は、最初から綺麗な抽象化を作ることではなく、まず `nixos-rebuild` が確実に通る最小 flake を作ることです。
+
+### 最小構成
+
+新しいプロジェクトは、次のような小さい構成から始めます。
+
+```text
+nixos_fallback/
+├── flake.nix
+├── hosts/
+│   └── machine/
+│       ├── configuration.nix
+│       └── hardware-configuration.nix
+└── modules/
+    └── base.nix
+```
+
+最初は以下を移植しません。
+
+- `setup.sh`
+- `import-tree`
+- host 自動生成
+- `install-args.nix`
+- niri / Home Manager / GUI 統合
+- 独自ハードウェア抽象化
+
+### 作成手順
+
+1. GUI Installer で NixOS を通常インストールします。
+2. 起動後に基本動作を確認します。
+   - ネットワーク
+   - boot loader
+   - GPU
+   - keyboard
+   - user login
+   - audio
+3. 新しいプロジェクトを作成し、生成済み設定をコピーします。
+
+```bash
+mkdir -p ~/nixos_fallback/hosts/machine ~/nixos_fallback/modules
+cp /etc/nixos/configuration.nix ~/nixos_fallback/hosts/machine/configuration.nix
+cp /etc/nixos/hardware-configuration.nix ~/nixos_fallback/hosts/machine/hardware-configuration.nix
+cd ~/nixos_fallback
+```
+
+4. 最小 `flake.nix` を作成します。
+
+```nix
+{
+  description = "Minimal NixOS flake from a working installation";
+
+  inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-25.05";
+
+  outputs = { nixpkgs, ... }: {
+    nixosConfigurations.machine = nixpkgs.lib.nixosSystem {
+      system = "x86_64-linux";
+      modules = [
+        ./modules/base.nix
+        ./hosts/machine/configuration.nix
+        ./hosts/machine/hardware-configuration.nix
+      ];
+    };
+  };
+}
+```
+
+5. 最小 `modules/base.nix` を作成します。
+
+```nix
+{ pkgs, ... }:
+{
+  nix.settings.experimental-features = [ "nix-command" "flakes" ];
+
+  environment.systemPackages = with pkgs; [
+    git
+    vim
+  ];
+
+  services.networkmanager.enable = true;
+}
+```
+
+6. まずビルドだけ確認します。
+
+```bash
+nix flake show
+nixos-rebuild build --flake .#machine
+```
+
+7. 成功したら switch します。
+
+```bash
+sudo nixos-rebuild switch --flake .#machine
+```
+
+### 段階的に戻すもの
+
+最小 flake が安定してから、次の順番で一つずつ戻します。
+
+1. 共通設定を `modules/base.nix` へ少しずつ移動
+2. Home Manager
+3. niri / display manager / portal
+4. GUI アプリ
+5. 開発ツール
+6. 独自 hardware module
+
+各段階で必ず確認します。
+
+```bash
+nixos-rebuild build --flake .#machine
+git diff
+```
+
+`hardware-configuration.nix` は GUI Installer が生成した事実ベースの設定として扱い、原則そのまま維持します。
 
 ---
 
