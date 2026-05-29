@@ -8,12 +8,32 @@
   #   - xdg-desktop-portal (gtk + gnome バックエンド)
   #   - Wayland 基本ツール + ironbar (シェル UI)
   # ユーザーアプリ (spacedrive 等) は homeManager.jade で管理する。
-  flake.modules.nixos.desktop = { config, lib, pkgs, ... }: {
+  flake.modules.nixos.desktop = { config, lib, options, pkgs, ... }:
+  let
+    desktopUser = "jade";
+    niriSessionForDesktopUser = pkgs.writeShellScript "niri-session-for-${desktopUser}" ''
+      session_user="$(${pkgs.coreutils}/bin/id -un)"
+      if [ "$session_user" != "${desktopUser}" ]; then
+        printf '%s\n' 'This niri session is configured only for jade. Use a TTY for admin.'
+        ${pkgs.coreutils}/bin/sleep 3
+        exit 1
+      fi
+
+      exec ${config.programs.niri.package}/bin/niri-session
+    '';
+    niriUserServiceOptions =
+      options.systemd.user.services.type.getSubOptions [ "niri" ];
+  in {
     # ── Compositor & System Services ────────────────────────────────────────
     hardware.graphics.enable = true;
 
     programs.niri.enable = true;
     programs.dconf.enable = true;
+
+    # programs.niri.enable registers niri as a global display-manager session.
+    # This host starts niri explicitly through greetd, so do not advertise it as
+    # a selectable session for non-desktop users such as admin.
+    services.displayManager.sessionPackages = lib.mkForce [];
 
     # niri 周辺で必要になりやすい基本サービスを desktop module 側で明示する。
     services.dbus.enable  = true;
@@ -31,10 +51,18 @@
     services.greetd = {
       enable = true;
       settings.default_session = {
-        command = "${pkgs.greetd.tuigreet}/bin/tuigreet --time --cmd ${config.programs.niri.package}/bin/niri-session";
+        command = "${pkgs.greetd.tuigreet}/bin/tuigreet --time --cmd ${niriSessionForDesktopUser}";
         user    = "greeter";
       };
     };
+
+    systemd.user.services.niri = lib.optionalAttrs
+      (niriUserServiceOptions ? enableDefaultPath)
+      {
+        # NixOS Wiki recommends this for niri-session so the niri user service
+        # inherits the PATH imported by niri-session instead of a stripped one.
+        enableDefaultPath = false;
+      };
 
     # ── XDG Desktop Portal ───────────────────────────────────────────────────
     # niri のスクリーン共有には GNOME portal、ファイル選択には GTK portal を使う。
@@ -125,12 +153,6 @@
 
     # ── Niri config.kdl ──────────────────────────────────────────────────────
     xdg.configFile."niri/config.kdl".text = ''
-      output "Virtual-1" {
-        mode "1920x1080@60"
-        scale 1
-        position x=0 y=0
-      }
-
       input {
         keyboard {
           xkb {
