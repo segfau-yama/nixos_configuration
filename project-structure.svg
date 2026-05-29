@@ -1,0 +1,166 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1800" height="1180" viewBox="0 0 1800 1180">
+  <defs>
+    <filter id="softShadow" x="-8%" y="-8%" width="116%" height="116%">
+      <feDropShadow dx="3" dy="4" stdDeviation="0.7" flood-color="#222" flood-opacity="0.18"/>
+    </filter>
+    <marker id="arrow" markerWidth="11" markerHeight="11" refX="9" refY="5.5" orient="auto" markerUnits="strokeWidth">
+      <path d="M 1.5 1.5 L 9.5 5.5 L 1.5 9.5" fill="none" stroke="#222" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+    </marker>
+    <style>
+      .bg { fill: #fffdf7; }
+      .lane { fill: #ffffff; stroke: #ece2d4; stroke-width: 3; stroke-dasharray: 12 12; }
+      .node { stroke: #222; stroke-width: 4.5; filter: url(#softShadow); }
+      .flow { fill: none; stroke: #222; stroke-width: 3.2; stroke-linecap: round; stroke-linejoin: round; marker-end: url(#arrow); }
+      .softFlow { fill: none; stroke: #555; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; marker-end: url(#arrow); }
+      .title { font: 700 42px "Comic Sans MS", "Bradley Hand", "Segoe Print", cursive; fill: #222; }
+      .subtitle { font: 700 24px "Comic Sans MS", "Bradley Hand", "Segoe Print", cursive; fill: #333; }
+      .laneTitle { font: 700 26px "Comic Sans MS", "Bradley Hand", "Segoe Print", cursive; fill: #6b5f52; }
+      .big { font: 700 34px "Comic Sans MS", "Bradley Hand", "Segoe Print", cursive; fill: #222; }
+      .mid { font: 700 25px "Comic Sans MS", "Bradley Hand", "Segoe Print", cursive; fill: #222; }
+      .small { font: 700 19px "Comic Sans MS", "Bradley Hand", "Segoe Print", cursive; fill: #222; }
+      .label { font: 700 21px "Comic Sans MS", "Bradley Hand", "Segoe Print", cursive; fill: #222; }
+    </style>
+  </defs>
+
+  <rect class="bg" width="1800" height="1180"/>
+  <text class="title" x="56" y="70">nixos_configuration</text>
+  <text class="subtitle" x="58" y="108">Readable map of how flake.nix becomes host outputs and reusable modules</text>
+
+  <rect class="lane" x="50" y="145" width="1700" height="205" rx="28"/>
+  <text class="laneTitle" x="76" y="182">1. Flake entry point</text>
+
+  <g transform="rotate(-0.6 165 252)">
+    <rect class="node" x="70" y="218" width="210" height="80" rx="20" fill="#dff1ff"/>
+    <text class="big" x="104" y="270">flake.nix</text>
+  </g>
+  <g transform="rotate(0.5 475 252)">
+    <rect class="node" x="360" y="218" width="250" height="80" rx="20" fill="#fff2f4"/>
+    <text class="big" x="402" y="270">mkFlake</text>
+  </g>
+  <g transform="rotate(-0.4 815 252)">
+    <rect class="node" x="682" y="218" width="280" height="80" rx="20" fill="#ffe7a8"/>
+    <text class="big" x="722" y="270">import-tree</text>
+  </g>
+  <g transform="rotate(0.4 1182 252)">
+    <rect class="node" x="1040" y="208" width="315" height="100" rx="22" fill="#ffc7d0"/>
+    <text class="big" x="1114" y="254">modules/</text>
+    <text class="small" x="1090" y="284" textLength="220" lengthAdjust="spacingAndGlyphs">all .nix files are discovered</text>
+  </g>
+
+  <path class="flow" d="M 282 258 L 356 258"/>
+  <text class="label" x="296" y="239">flake-parts</text>
+  <path class="flow" d="M 612 258 L 678 258"/>
+  <text class="label" x="622" y="239">calls</text>
+  <path class="flow" d="M 965 258 L 1036 258"/>
+  <text class="label" x="988" y="228">imports</text>
+
+  <rect class="lane" x="50" y="390" width="1700" height="355" rx="28"/>
+  <text class="laneTitle" x="76" y="428">2. Host outputs</text>
+
+  <g transform="rotate(0.5 185 556)">
+    <rect class="node" x="70" y="500" width="250" height="112" rx="24" fill="#f4efff"/>
+    <text class="mid" x="108" y="546">lib/helpers.nix</text>
+    <text class="small" x="124" y="578">self.lib.mkNixos</text>
+  </g>
+  <g transform="rotate(-0.5 500 556)">
+    <rect class="node" x="380" y="500" width="260" height="112" rx="24" fill="#bce6ff"/>
+    <text class="big" x="456" y="550">hosts/</text>
+    <text class="small" x="424" y="580">host-specific modules</text>
+  </g>
+  <g transform="rotate(0.6 830 466)">
+    <rect class="node" x="700" y="420" width="285" height="105" rx="24" fill="#bff3c6"/>
+    <text class="mid" x="770" y="466">laptop/</text>
+    <text class="small" x="735" y="494">flake-parts + laptop.nix</text>
+  </g>
+  <g transform="rotate(-0.5 852 650)">
+    <rect class="node" x="700" y="600" width="330" height="112" rx="24" fill="#bff3c6"/>
+    <text class="mid" x="752" y="647">virtual_machine/</text>
+    <text class="small" x="760" y="678" textLength="205" lengthAdjust="spacingAndGlyphs">flake-parts + vm.nix</text>
+  </g>
+  <g transform="rotate(-0.4 1225 556)">
+    <rect class="node" x="1090" y="495" width="310" height="122" rx="24" fill="#aeeeb8"/>
+    <text class="mid" x="1132" y="545">nixosConfigurations</text>
+    <text class="small" x="1165" y="577">laptop</text>
+    <text class="small" x="1235" y="577">virtual_machine</text>
+  </g>
+  <g transform="rotate(0.4 1572 556)">
+    <rect class="node" x="1458" y="500" width="255" height="112" rx="24" fill="#f1f1f1"/>
+    <text class="mid" x="1500" y="546">nixos/&lt;host&gt;</text>
+    <text class="small" x="1492" y="578">hardware-config.nix</text>
+  </g>
+
+  <path class="flow" d="M 322 556 L 376 556"/>
+  <text class="label" x="330" y="535">used by</text>
+  <path class="flow" d="M 642 535 C 665 500, 678 480, 696 468"/>
+  <path class="flow" d="M 642 580 C 670 620, 682 640, 696 652"/>
+  <text class="label" x="650" y="557">mkNixos</text>
+  <path class="flow" d="M 987 470 C 1035 490, 1060 518, 1086 544"/>
+  <path class="flow" d="M 1032 652 C 1070 626, 1080 594, 1088 570"/>
+  <text class="label" x="1044" y="510">outputs</text>
+  <path class="softFlow" d="M 1402 556 L 1454 556"/>
+  <text class="label" x="1410" y="535">imports</text>
+
+  <rect class="lane" x="50" y="785" width="1700" height="345" rx="28"/>
+  <text class="laneTitle" x="76" y="823">3. Software architecture: software contains base.nix, gui, and cui</text>
+
+  <g transform="rotate(-0.25 585 970)">
+    <rect class="node" x="75" y="845" width="1020" height="250" rx="28" fill="#fff0a8"/>
+    <text class="big" x="110" y="895">software/</text>
+    <text class="small" x="112" y="925">module container</text>
+  </g>
+
+  <g transform="rotate(0.15 510 880)">
+    <rect class="node" x="285" y="850" width="720" height="62" rx="20" fill="#d9f7ff"/>
+    <text class="mid" x="318" y="889">base.nix</text>
+    <text class="small" x="456" y="889" textLength="455" lengthAdjust="spacingAndGlyphs">Nix / network / locale / audio / hardware</text>
+  </g>
+
+  <g transform="rotate(-0.15 510 970)">
+    <rect class="node" x="285" y="925" width="720" height="78" rx="20" fill="#ffd4a8"/>
+    <text class="mid" x="318" y="972">gui/</text>
+    <rect x="420" y="945" width="120" height="36" rx="14" fill="#fff8e6" stroke="#222" stroke-width="3"/>
+    <text class="small" x="442" y="969">desktop</text>
+    <rect x="555" y="945" width="120" height="36" rx="14" fill="#fff8e6" stroke="#222" stroke-width="3"/>
+    <text class="small" x="576" y="969">browser</text>
+    <rect x="690" y="945" width="112" height="36" rx="14" fill="#fff8e6" stroke="#222" stroke-width="3"/>
+    <text class="small" x="714" y="969">gaming</text>
+    <rect x="817" y="945" width="72" height="36" rx="14" fill="#fff8e6" stroke="#222" stroke-width="3"/>
+    <text class="small" x="838" y="969">CAD</text>
+    <rect x="904" y="945" width="78" height="36" rx="14" fill="#fff8e6" stroke="#222" stroke-width="3"/>
+    <text class="small" x="928" y="969">zed</text>
+  </g>
+
+  <g transform="rotate(0.15 510 1060)">
+    <rect class="node" x="285" y="1015" width="720" height="78" rx="20" fill="#bfe8ff"/>
+    <text class="mid" x="318" y="1062">cui/</text>
+    <rect x="420" y="1035" width="128" height="36" rx="14" fill="#eef9ff" stroke="#222" stroke-width="3"/>
+    <text class="small" x="440" y="1059">cli-tools</text>
+    <rect x="565" y="1035" width="86" height="36" rx="14" fill="#eef9ff" stroke="#222" stroke-width="3"/>
+    <text class="small" x="588" y="1059">lang</text>
+    <rect x="668" y="1035" width="128" height="36" rx="14" fill="#eef9ff" stroke="#222" stroke-width="3"/>
+    <text class="small" x="686" y="1059">nix-tools</text>
+    <rect x="813" y="1035" width="164" height="36" rx="14" fill="#eef9ff" stroke="#222" stroke-width="3"/>
+    <text class="small" x="832" y="1059">programming</text>
+  </g>
+
+  <g transform="rotate(0.25 1430 970)">
+    <rect class="node" x="1280" y="850" width="405" height="245" rx="24" fill="#dcffd6"/>
+    <text class="mid" x="1430" y="895">recipes</text>
+    <text class="small" x="1320" y="935">desktop user</text>
+    <text class="small" x="1345" y="963" textLength="285" lengthAdjust="spacingAndGlyphs">base + gui/desktop + cui/cli-tools</text>
+    <text class="small" x="1320" y="1000">GUI workstation</text>
+    <text class="small" x="1345" y="1028">base + gui/*</text>
+    <text class="small" x="1320" y="1065">CUI/admin: base + cui/*</text>
+  </g>
+
+  <path class="flow" d="M 1100 970 C 1165 970, 1215 970, 1276 970"/>
+  <text class="label" x="1130" y="945">compose into</text>
+
+  <path class="softFlow" d="M 1245 618 C 1220 728, 1135 805, 1155 886"/>
+  <text class="label" x="1190" y="760">hosts/users select blocks</text>
+
+  <g transform="rotate(-0.4 310 1152)">
+    <rect class="node" x="70" y="1135" width="560" height="38" rx="18" fill="#ffffff"/>
+    <text class="small" x="96" y="1161" textLength="480" lengthAdjust="spacingAndGlyphs">Legend: large arrow = modules compose into recipes</text>
+  </g>
+</svg>
