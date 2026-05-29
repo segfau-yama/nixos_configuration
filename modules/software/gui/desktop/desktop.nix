@@ -36,9 +36,6 @@
       };
     };
 
-    # user service が /run/current-system/sw/bin を暗黙に拾わないようにする。
-    systemd.user.services.niri.enableDefaultPath = false;
-
     # ── XDG Desktop Portal ───────────────────────────────────────────────────
     # niri のスクリーン共有には GNOME portal、ファイル選択には GTK portal を使う。
     xdg.portal = {
