@@ -2,6 +2,7 @@
 set -euo pipefail
 
 REPO_URL="${REPO_URL:-https://github.com/segfau-yama/nixos_configuration.git}"
+SOURCE_REPO=""
 
 # Edit this block before running in a minimal CLI environment.
 # PROFILE is selected interactively from modules/hosts at runtime.
@@ -56,20 +57,54 @@ run() {
   fi
 }
 
+is_repo_root() {
+  local path="$1"
+  [[ -f "$path/flake.nix" && -d "$path/modules/hosts" ]]
+}
+
+prepare_source_repo() {
+  local script_dir
+  script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
+
+  if is_repo_root "$PWD"; then
+    SOURCE_REPO="$PWD"
+    return
+  fi
+
+  if is_repo_root "$script_dir"; then
+    SOURCE_REPO="$script_dir"
+    return
+  fi
+
+  SOURCE_REPO="/tmp/nixos_configuration_setup_source"
+  if is_repo_root "$SOURCE_REPO"; then
+    info "Using setup source repository at $SOURCE_REPO"
+    return
+  fi
+
+  info "Cloning setup source repository to $SOURCE_REPO"
+  if [[ "$DRY_RUN" == true ]]; then
+    info "Would clone $REPO_URL into $SOURCE_REPO"
+    error "Cannot discover install profiles in dry-run without a local repository checkout."
+  fi
+
+  git clone "$REPO_URL" "$SOURCE_REPO"
+}
+
 copy_or_clone_repo() {
   local target_repo="$1"
 
   run mkdir -p "$target_repo"
 
-  if [[ -f ./flake.nix && -d ./modules ]]; then
-    info "Copying local repository to $target_repo"
+  if [[ -n "$SOURCE_REPO" && -f "$SOURCE_REPO/flake.nix" && -d "$SOURCE_REPO/modules" ]]; then
+    info "Copying source repository from $SOURCE_REPO to $target_repo"
     if command -v rsync >/dev/null 2>&1; then
-      run rsync -a --exclude '/jadeos_setting_tui/target' ./ "$target_repo"/
+      run rsync -a --exclude '/jadeos_setting_tui/target' "$SOURCE_REPO"/ "$target_repo"/
     else
       if [[ "$DRY_RUN" == true ]]; then
         info "Would copy local repository with tar fallback"
       else
-        tar -C . --exclude './jadeos_setting_tui/target' -cf - . | tar -C "$target_repo" -xf -
+        tar -C "$SOURCE_REPO" --exclude './jadeos_setting_tui/target' -cf - . | tar -C "$target_repo" -xf -
       fi
     fi
   elif [[ -d "$target_repo/.git" && -f "$target_repo/flake.nix" ]]; then
@@ -132,9 +167,9 @@ discover_profiles() {
     [[ -n "$profile" ]] || continue
     [[ "$profile" == ".gitkeep" ]] && continue
     out_profiles+=("$profile")
-  done < <(find modules/hosts -mindepth 1 -maxdepth 1 -type d | sort)
+  done < <(find "$SOURCE_REPO/modules/hosts" -mindepth 1 -maxdepth 1 -type d | sort)
 
-  ((${#out_profiles[@]} > 0)) || error "No valid hosts found in modules/hosts"
+  ((${#out_profiles[@]} > 0)) || error "No valid hosts found in $SOURCE_REPO/modules/hosts"
 }
 
 select_profile() {
@@ -216,6 +251,8 @@ main() {
   if [[ "$DRY_RUN" != true && ! -b "$TARGET_DISK" ]]; then
     error "Block device not found: $TARGET_DISK"
   fi
+
+  prepare_source_repo
 
   local part_boot="${TARGET_DISK}1"
   local part_root="${TARGET_DISK}2"
