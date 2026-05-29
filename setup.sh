@@ -119,6 +119,22 @@ copy_or_clone_repo() {
   fi
 }
 
+scrub_removed_options() {
+  local target_repo="$1"
+  local desktop_module="$target_repo/modules/software/gui/desktop/desktop.nix"
+
+  if [[ ! -f "$desktop_module" ]]; then
+    return
+  fi
+
+  if [[ "$DRY_RUN" == true ]]; then
+    info "Would remove unsupported enableDefaultPath option from $desktop_module"
+    return
+  fi
+
+  sed -i '/systemd\.user\.services\.niri\.enableDefaultPath/d' "$desktop_module"
+}
+
 write_install_args() {
   local path="$1"
   local boot_part="$2"
@@ -298,6 +314,7 @@ main() {
   run swapon "$part_swap"
 
   copy_or_clone_repo "$target_repo"
+  scrub_removed_options "$target_repo"
 
   run mkdir -p "$profile_dir"
   write_install_args "$install_args" "$part_boot" "$part_root" "$part_swap"
