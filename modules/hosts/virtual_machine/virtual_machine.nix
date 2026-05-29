@@ -22,7 +22,12 @@
 
     console.keyMap = "us";
 
+    boot.kernelParams = [
+      "video=Virtual-1:1920x1080@60e"
+    ];
+
     services.qemuGuest.enable = true;
+    services.spice-autorandr.enable = true;
     systemd.services.NetworkManager-wait-online.enable = false;
   };
 }

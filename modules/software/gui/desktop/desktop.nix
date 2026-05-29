@@ -125,6 +125,12 @@
 
     # ── Niri config.kdl ──────────────────────────────────────────────────────
     xdg.configFile."niri/config.kdl".text = ''
+      output "Virtual-1" {
+        mode "1920x1080@60"
+        scale 1
+        position x=0 y=0
+      }
+
       input {
         keyboard {
           xkb {
