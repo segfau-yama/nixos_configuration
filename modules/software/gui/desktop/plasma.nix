@@ -14,7 +14,9 @@
 
       exec ${config.programs.niri.package}/bin/niri-session
     '';
-    niriDesktopSession = pkgs.runCommand "niri-jade-wayland-session" { } ''
+    niriDesktopSession = pkgs.runCommand "niri-jade-wayland-session" {
+      passthru.providedSessions = [ "niri-jade" ];
+    } ''
       mkdir -p "$out/share/wayland-sessions"
       cat > "$out/share/wayland-sessions/niri-jade.desktop" <<EOF
       [Desktop Entry]

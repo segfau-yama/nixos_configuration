@@ -15,7 +15,7 @@
 | モジュール管理 | [flake-parts](https://github.com/hercules-ci/flake-parts) + [import-tree](https://github.com/vic/import-tree) |
 | ユーザー環境 | [Home Manager](https://github.com/nix-community/home-manager) |
 | チャンネル | nixpkgs-25.05 (stable) / nixos-unstable (一部パッケージ) |
-| デスクトップ | Niri (Wayland) + IronBar + greetd |
+| デスクトップ | KDE Plasma 6 + SDDM (Wayland) / Niri + IronBar |
 | 入力メソッド | fcitx5 + mozc |
 | 音声 | PipeWire + WirePlumber |
 
@@ -56,7 +56,7 @@ nixos_configuration/
     │   ├── base.nix             # 共通基盤（Nix設定・locale・fcitx5・audio）
     │   │
     │   ├── gui/
-    │   │   ├── desktop/         # Niri・greetd・XDG Portal・IronBar (NixOS + HM)
+    │   │   ├── desktop/         # Plasma・SDDM・Niri・XDG Portal・IronBar (NixOS + HM)
     │   │   ├── browser/         # Chromium
     │   │   ├── gaming/          # Lutris・Wine・Winetricks
     │   │   ├── media/           # Spotify・mpv・playerctl
@@ -92,7 +92,7 @@ nixos_configuration/
 | `base` | ブート・NM・Nix GC・stateVersion・unstable overlay・locale・fcitx5・audio |
 | `hardware` | GPU/CPU ドライバー・マイクロコード・nix-auto-storage（`my.hardware.*` オプション） |
 | `home-manager` | Home Manager NixOS 統合 |
-| `desktop` | Niri・greetd・polkit・seatd・XDG Portal・IronBar |
+| `desktop` | Plasma・SDDM・Niri・polkit・seatd・XDG Portal・IronBar |
 | `programming` | nix-ld（パッチなし ELF バイナリ実行） |
 | `jade` | jade ユーザー定義 + HM 統合 |
 | `admin` | admin ユーザー定義 |
@@ -447,7 +447,7 @@ passwd admin  # 必要に応じて
 | nix-auto-storage 設定 | `modules/hardware/hardware.nix` |
 | ホスト固有設定（GPU 種別等） | `modules/hosts/<hostname>/configuration.nix` |
 | 共通基盤（Nix・GC・ブート・locale・入力・音声） | `modules/software/base.nix` |
-| Niri・greetd・IronBar | `modules/software/gui/desktop/desktop.nix` |
+| Plasma・SDDM・Niri・IronBar | `modules/software/gui/desktop/` |
 | ゲーミング (Lutris/Wine) | `modules/software/gui/gaming/gaming.nix` |
 | 開発ツール（シェル・Direnv） | `modules/software/cui/programming/programming.nix` |
 | 言語ツールチェーン | `modules/software/cui/lang/lang.nix` |
