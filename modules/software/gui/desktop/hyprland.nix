@@ -109,7 +109,7 @@
 
       env = XCURSOR_SIZE,24
       env = HYPRCURSOR_SIZE,24
-      env = XKB_DEFAULT_LAYOUT,jp
+      env = XKB_DEFAULT_LAYOUT,us
       env = XMODIFIERS,@im=fcitx5
       env = GTK_IM_MODULE,fcitx5
       env = QT_IM_MODULE,fcitx5
@@ -188,9 +188,9 @@
       }
 
       input {
-          kb_layout = jp
+          kb_layout = us
           kb_variant =
-          kb_model = jp106
+          kb_model =
           kb_options =
           kb_rules =
           follow_mouse = 1
