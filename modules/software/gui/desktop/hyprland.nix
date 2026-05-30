@@ -103,7 +103,7 @@
       exec-once = ${pkgs.polkit_gnome}/libexec/polkit-gnome-authentication-agent-1
       exec-once = hyprpaper
       exec-once = hypridle
-      exec-once = ironbar
+      exec-once = ${pkgs.ironbar}/bin/ironbar
       exec-once = wlsunset -l 35.7 -L 139.7
       exec-once = wl-paste --watch cliphist store
 
@@ -272,30 +272,6 @@
       bindl = , XF86AudioPause, exec, playerctl play-pause
       bindl = , XF86AudioPlay, exec, playerctl play-pause
       bindl = , XF86AudioPrev, exec, playerctl previous
-
-      windowrule {
-          name = suppress-maximize-events
-          match:class = .*
-          suppress_event = maximize
-      }
-
-      windowrule {
-          name = fix-xwayland-drags
-          match:class = ^$
-          match:title = ^$
-          match:xwayland = true
-          match:float = true
-          match:fullscreen = false
-          match:pin = false
-          no_focus = true
-      }
-
-      windowrule {
-          name = move-hyprland-run
-          match:class = hyprland-run
-          move = 20 monitor_h-120
-          float = yes
-      }
 
       xwayland {
           force_zero_scaling = true
