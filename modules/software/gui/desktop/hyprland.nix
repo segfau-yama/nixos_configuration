@@ -60,11 +60,11 @@
       hypridle
       hyprpaper
       hyprshot
+      ironbar
       mako
       playerctl
       polkit_gnome
       slurp
-      waybar
       wl-clipboard
       wlsunset
       wofi
@@ -81,10 +81,10 @@
       hypridle
       hyprpaper
       hyprshot
+      ironbar
       mako
       playerctl
       polkit_gnome
-      waybar
       wl-clipboard
       wlsunset
       wofi
@@ -103,7 +103,7 @@
       exec-once = ${pkgs.polkit_gnome}/libexec/polkit-gnome-authentication-agent-1
       exec-once = hyprpaper
       exec-once = hypridle
-      exec-once = waybar
+      exec-once = ironbar
       exec-once = wlsunset -l 35.7 -L 139.7
       exec-once = wl-paste --watch cliphist store
 
@@ -320,6 +320,159 @@
           timeout = 900
           on-timeout = hyprctl dispatch dpms off
           on-resume = hyprctl dispatch dpms on
+      }
+    '';
+
+    xdg.configFile."ironbar/config.json".text = ''
+      {
+        "position": "top",
+        "height": 42,
+        "margin": {
+          "top": 6,
+          "left": 8,
+          "right": 8
+        },
+        "start": [
+          {
+            "type": "workspaces"
+          }
+        ],
+        "center": [
+          {
+            "type": "focused",
+            "max_length": 60
+          }
+        ],
+        "end": [
+          {
+            "type": "button",
+            "name": "launcher",
+            "label": "󰣇",
+            "on_click": "wofi --show drun"
+          },
+          {
+            "type": "volume",
+            "format": "{icon}"
+          },
+          {
+            "type": "label",
+            "name": "network",
+            "label": "{{3000:if nmcli -t -f STATE g 2>/dev/null | grep -q '^connected'; then if nmcli -t -f TYPE,STATE dev 2>/dev/null | grep -q '^ethernet:connected'; then echo '󰈀'; else echo '󰖩'; fi; else echo '󰖪'; fi}}"
+          },
+          {
+            "type": "battery",
+            "show_if": "ls /sys/class/power_supply/ | grep --quiet '^BAT'",
+            "format": "{icon}"
+          },
+          {
+            "type": "tray"
+          },
+          {
+            "type": "button",
+            "name": "power",
+            "label": "⏻",
+            "on_click": "systemctl suspend",
+            "on_middle_click": "systemctl poweroff",
+            "on_right_click": "systemctl reboot"
+          },
+          {
+            "type": "clock",
+            "format": "%Y-%m-%d (%a) %H:%M"
+          }
+        ]
+      }
+    '';
+
+    xdg.configFile."ironbar/style.css".text = ''
+      * {
+        font-family: "Inter", "Symbols Nerd Font", "Font Awesome 6 Free", "Noto Sans CJK JP", sans-serif;
+        font-size: 13px;
+        font-weight: 600;
+        min-height: 0;
+      }
+
+      .background {
+        background: rgba(17, 17, 27, 0.7);
+        color: #edf6f4;
+        border-bottom: 1px solid rgba(203, 166, 247, 0.15);
+        border-radius: 14px;
+      }
+
+      tooltip,
+      .popup {
+        background: rgba(17, 17, 27, 0.96);
+        color: #cdd6f4;
+        border: 1px solid rgba(203, 166, 247, 0.28);
+        border-radius: 12px;
+      }
+
+      .module {
+        margin: 4px 1px;
+        padding: 0 10px;
+        border-radius: 9px;
+        border: none;
+        background: transparent;
+        transition: background-color 0.2s ease, color 0.2s ease;
+      }
+
+      .module:hover {
+        background: rgba(203, 166, 247, 0.12);
+      }
+
+      #workspaces {
+        margin: 0;
+        padding: 0 2px;
+        background: transparent;
+        border: none;
+      }
+
+      #workspaces .item {
+        padding: 0 13px;
+        margin: 5px 2px;
+        min-height: 28px;
+        border-radius: 9px;
+        background: transparent;
+        color: #6c7086;
+        font-size: 13px;
+        font-weight: 700;
+      }
+
+      #workspaces .item:hover {
+        background: rgba(203, 166, 247, 0.14);
+        color: #cdd6f4;
+      }
+
+      #workspaces .item.focused {
+        background: rgba(203, 166, 247, 0.28);
+        color: #cba6f7;
+      }
+
+      #focused {
+        color: #bac2de;
+        padding: 0 10px;
+      }
+
+      #launcher {
+        color: #cba6f7;
+        font-size: 18px;
+        padding: 0 12px;
+      }
+
+      #volume,
+      #network,
+      #battery,
+      #tray,
+      #power {
+        color: #cba6f7;
+        font-size: 17px;
+      }
+
+      #clock {
+        color: #cdd6f4;
+        background: rgba(49, 50, 68, 0.65);
+        border-radius: 9px;
+        padding: 0 16px;
+        margin: 4px 4px 4px 8px;
       }
     '';
   };

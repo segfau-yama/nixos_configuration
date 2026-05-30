@@ -56,7 +56,7 @@ nixos_configuration/
     │   ├── base.nix             # 共通基盤（Nix設定・locale・fcitx5・audio）
     │   │
     │   ├── gui/
-    │   │   ├── desktop/         # Hyprland・greetd・XDG Portal・Waybar (NixOS + HM)
+    │   │   ├── desktop/         # Hyprland・greetd・XDG Portal・Ironbar (NixOS + HM)
     │   │   ├── browser/         # Chromium
     │   │   ├── gaming/          # Lutris・Wine・Winetricks
     │   │   ├── media/           # Spotify・mpv・playerctl
@@ -92,7 +92,7 @@ nixos_configuration/
 | `base` | ブート・NM・Nix GC・stateVersion・unstable overlay・locale・fcitx5・audio |
 | `hardware` | GPU/CPU ドライバー・マイクロコード・nix-auto-storage（`my.hardware.*` オプション） |
 | `home-manager` | Home Manager NixOS 統合 |
-| `desktop` | Hyprland・greetd・polkit・seatd・XDG Portal・Waybar |
+| `desktop` | Hyprland・greetd・polkit・seatd・XDG Portal・Ironbar |
 | `programming` | nix-ld（パッチなし ELF バイナリ実行） |
 | `suichan` | suichan ユーザー定義 + HM 統合 |
 | `admin` | admin ユーザー定義 |
@@ -101,7 +101,7 @@ nixos_configuration/
 
 | モジュール名 | 役割 |
 |---|---|
-| `desktop` | Hyprland config・Hyprpaper・Waybar・mako |
+| `desktop` | Hyprland config・Hyprpaper・Ironbar・mako |
 | `programming` | Zsh・Nushell・Direnv |
 | `lang` | Rust・Clang・mold・Python |
 | `nix-tools` | nix-index・devenv・nil・nixfmt-rfc-style |
@@ -447,7 +447,7 @@ passwd admin  # 必要に応じて
 | nix-auto-storage 設定 | `modules/hardware/hardware.nix` |
 | ホスト固有設定（GPU 種別等） | `modules/hosts/<hostname>/configuration.nix` |
 | 共通基盤（Nix・GC・ブート・locale・入力・音声） | `modules/software/base.nix` |
-| Hyprland・greetd・Waybar | `modules/software/gui/desktop/` |
+| Hyprland・greetd・Ironbar | `modules/software/gui/desktop/` |
 | ゲーミング (Lutris/Wine) | `modules/software/gui/gaming/gaming.nix` |
 | 開発ツール（シェル・Direnv） | `modules/software/cui/programming/programming.nix` |
 | 言語ツールチェーン | `modules/software/cui/lang/lang.nix` |
