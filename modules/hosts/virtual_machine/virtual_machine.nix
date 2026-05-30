@@ -5,7 +5,7 @@
       base
       home-manager
       desktop
-      jade
+      suichan
       admin
     ] ++ [ "${inputs.self}/nixos/virtual_machine/hardware-configuration.nix" ];
 

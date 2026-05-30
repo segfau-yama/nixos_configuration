@@ -3,11 +3,11 @@
   # desktopHyprland (NixOS): Hyprland と greetd/tuigreet ログイン。
   flake.modules.nixos.desktopHyprland = { config, pkgs, ... }:
   let
-    desktopUser = "jade";
+    desktopUser = "suichan";
     hyprlandSessionForDesktopUser = pkgs.writeShellScript "hyprland-session-for-${desktopUser}" ''
       session_user="$(${pkgs.coreutils}/bin/id -un)"
       if [ "$session_user" != "${desktopUser}" ]; then
-        printf '%s\n' 'This Hyprland session is configured only for jade. Use a TTY for admin.'
+        printf '%s\n' 'This Hyprland session is configured only for suichan. Use a TTY for admin.'
         ${pkgs.coreutils}/bin/sleep 3
         exit 1
       fi
@@ -72,7 +72,7 @@
     ];
   };
 
-  # desktopHyprland (Home Manager): jade の Hyprland 設定。
+  # desktopHyprland (Home Manager): suichan の Hyprland 設定。
   flake.modules.homeManager.desktopHyprland = { pkgs, ... }: {
     home.packages = with pkgs; [
       brightnessctl

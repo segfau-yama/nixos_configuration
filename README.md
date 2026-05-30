@@ -72,8 +72,8 @@ nixos_configuration/
     │       └── cli-tools/       # git・xh・jaq・just・pkg-config
     │
     ├── users/
-    │   ├── jade/
-    │   │   └── jade.nix         # メインユーザー（GUI フルセット）
+    │   ├── suichan/
+    │   │   └── suichan.nix      # メインユーザー（GUI フルセット）
     │   └── admin/
     │       └── admin.nix        # 管理者ユーザー
     │
@@ -94,7 +94,7 @@ nixos_configuration/
 | `home-manager` | Home Manager NixOS 統合 |
 | `desktop` | Hyprland・greetd・polkit・seatd・XDG Portal・Waybar |
 | `programming` | nix-ld（パッチなし ELF バイナリ実行） |
-| `jade` | jade ユーザー定義 + HM 統合 |
+| `suichan` | suichan ユーザー定義 + HM 統合 |
 | `admin` | admin ユーザー定義 |
 
 ### Home Manager モジュール（`modules.homeManager.*`）
@@ -113,7 +113,7 @@ nixos_configuration/
 | `kicad` | KiCad |
 | `freecad` | FreeCAD (Wayland)・MeshLab |
 | `zed` | Zed エディター（unstable チャンネル） |
-| `jade` | jade ユーザーの HM 設定（上記モジュールを組み合わせ） |
+| `suichan` | suichan ユーザーの HM 設定（上記モジュールを組み合わせ） |
 
 ---
 
@@ -424,7 +424,7 @@ git diff
 ユーザーパスワードを設定します（TTY から root でログイン）。
 
 ```bash
-passwd jade
+passwd suichan
 passwd admin  # 必要に応じて
 ```
 
@@ -451,7 +451,7 @@ passwd admin  # 必要に応じて
 | ゲーミング (Lutris/Wine) | `modules/software/gui/gaming/gaming.nix` |
 | 開発ツール（シェル・Direnv） | `modules/software/cui/programming/programming.nix` |
 | 言語ツールチェーン | `modules/software/cui/lang/lang.nix` |
-| ユーザー設定（jade） | `modules/users/jade/jade.nix` |
+| ユーザー設定（suichan） | `modules/users/suichan/suichan.nix` |
 
 ### 2. 変更を Git に追加
 

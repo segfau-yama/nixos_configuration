@@ -1,13 +1,13 @@
 { inputs, ... }:
 let
-  username = "jade";
+  username = "suichan";
 in
 {
-  # jade (NixOS): メインユーザーの定義と Home Manager 統合。
+  # suichan (NixOS): メインユーザーの定義と Home Manager 統合。
   flake.modules.nixos."${username}" = { pkgs, ... }: {
     users.users."${username}" = {
       isNormalUser = true;
-      description  = "Jade";
+      description  = "Suichan";
       extraGroups  = [
         "wheel"
         "networkmanager"
@@ -27,17 +27,16 @@ in
     };
   };
 
-  # jade (Home Manager): 最小限の GUI ユーザー設定 (desktop のみ)。
+  # suichan (Home Manager): Hyprland ユーザー設定。
   flake.modules.homeManager."${username}" = { ... }: {
     imports = with inputs.self.modules.homeManager; [
-      desktop     # Hyprland ユーザー設定
+      desktop
     ];
 
-    home.username    = "${username}";
+    home.username      = "${username}";
     home.homeDirectory = "/home/${username}";
     home.stateVersion  = "25.05";
 
     programs.home-manager.enable = true;
-
   };
 }
