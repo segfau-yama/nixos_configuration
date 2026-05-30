@@ -315,16 +315,15 @@
         ],
         "center": [
           {
-            "type": "focused",
-            "max_length": 60
+            "type": "focused"
           }
         ],
         "end": [
           {
-            "type": "button",
+            "type": "label",
             "name": "launcher",
             "label": "󰣇",
-            "on_click": "wofi --show drun"
+            "on_click_left": "wofi --show drun"
           },
           {
             "type": "volume",
@@ -336,20 +335,21 @@
             "label": "{{3000:if nmcli -t -f STATE g 2>/dev/null | grep -q '^connected'; then if nmcli -t -f TYPE,STATE dev 2>/dev/null | grep -q '^ethernet:connected'; then echo '󰈀'; else echo '󰖩'; fi; else echo '󰖪'; fi}}"
           },
           {
-            "type": "battery",
-            "show_if": "ls /sys/class/power_supply/ | grep --quiet '^BAT'",
-            "format": "{icon}"
-          },
-          {
             "type": "tray"
           },
           {
-            "type": "button",
+            "type": "label",
+            "name": "input-method",
+            "label": "あ"
+          },
+          {
+            "type": "label",
             "name": "power",
             "label": "⏻",
-            "on_click": "systemctl suspend",
-            "on_middle_click": "systemctl poweroff",
-            "on_right_click": "systemctl reboot"
+            "tooltip": "Left: suspend | Right: reboot | Middle: poweroff",
+            "on_click_left": "systemctl suspend",
+            "on_click_middle": "systemctl poweroff",
+            "on_click_right": "systemctl reboot"
           },
           {
             "type": "clock",
