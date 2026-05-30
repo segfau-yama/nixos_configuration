@@ -2,7 +2,7 @@
 
 個人用の NixOS 設定リポジトリです。
 
-**Wayland + Niri + NVIDIA + Gaming + 開発 + CAD** に対応した、保守性の高いデスクトップ環境を  
+**Wayland + NVIDIA + Gaming + 開発 + CAD** に対応した、保守性の高い NixOS 環境を  
 **Dendritic Pattern**（機能単位の自己完結モジュール構成）で構築しています。
 
 ---
@@ -15,7 +15,7 @@
 | モジュール管理 | [flake-parts](https://github.com/hercules-ci/flake-parts) + [import-tree](https://github.com/vic/import-tree) |
 | ユーザー環境 | [Home Manager](https://github.com/nix-community/home-manager) |
 | チャンネル | nixpkgs-25.05 (stable) / nixos-unstable (一部パッケージ) |
-| デスクトップ | KDE Plasma 6 + SDDM (Wayland) / Niri + IronBar |
+| デスクトップ | Hyprland + greetd/tuigreet |
 | 入力メソッド | fcitx5 + mozc |
 | 音声 | PipeWire + WirePlumber |
 
@@ -56,7 +56,7 @@ nixos_configuration/
     │   ├── base.nix             # 共通基盤（Nix設定・locale・fcitx5・audio）
     │   │
     │   ├── gui/
-    │   │   ├── desktop/         # Plasma・SDDM・Niri・XDG Portal・IronBar (NixOS + HM)
+    │   │   ├── desktop/         # Hyprland・greetd・XDG Portal・Waybar (NixOS + HM)
     │   │   ├── browser/         # Chromium
     │   │   ├── gaming/          # Lutris・Wine・Winetricks
     │   │   ├── media/           # Spotify・mpv・playerctl
@@ -92,7 +92,7 @@ nixos_configuration/
 | `base` | ブート・NM・Nix GC・stateVersion・unstable overlay・locale・fcitx5・audio |
 | `hardware` | GPU/CPU ドライバー・マイクロコード・nix-auto-storage（`my.hardware.*` オプション） |
 | `home-manager` | Home Manager NixOS 統合 |
-| `desktop` | Plasma・SDDM・Niri・polkit・seatd・XDG Portal・IronBar |
+| `desktop` | Hyprland・greetd・polkit・seatd・XDG Portal・Waybar |
 | `programming` | nix-ld（パッチなし ELF バイナリ実行） |
 | `jade` | jade ユーザー定義 + HM 統合 |
 | `admin` | admin ユーザー定義 |
@@ -101,7 +101,7 @@ nixos_configuration/
 
 | モジュール名 | 役割 |
 |---|---|
-| `desktop` | Niri config.kdl・IronBar・mako・swww（tofi ランチャー含む） |
+| `desktop` | Hyprland config・Hyprpaper・Waybar・mako |
 | `programming` | Zsh・Nushell・Direnv |
 | `lang` | Rust・Clang・mold・Python |
 | `nix-tools` | nix-index・devenv・nil・nixfmt-rfc-style |
@@ -292,7 +292,7 @@ my.hardware.cpu = lib.mkDefault "amd";
 ```
 
 > **VM 導入後の注意**
-> - Niri の描画: QEMU/KVM で Virgil3D を有効にすると GPU アクセラレーションが利きます（設定は別途必要）
+> - Wayland compositor の描画: QEMU/KVM で Virgil3D を有効にすると GPU アクセラレーションが利きます（設定は別途必要）
 > - `NetworkManager-wait-online.service` が起動を遅延させる場合は `systemd.services.NetworkManager-wait-online.enable = false;` を追加してください
 > - QEMU Guest Agent が必要な場合は `services.qemuGuest.enable = true;` を追加してください
 
@@ -325,7 +325,7 @@ nixos_fallback/
 - `import-tree`
 - host 自動生成
 - `install-args.nix`
-- niri / Home Manager / GUI 統合
+- Home Manager / GUI 統合
 - 独自ハードウェア抽象化
 
 ### 作成手順
@@ -403,7 +403,7 @@ sudo nixos-rebuild switch --flake .#machine
 
 1. 共通設定を `modules/base.nix` へ少しずつ移動
 2. Home Manager
-3. niri / display manager / portal
+3. window manager / display manager / portal
 4. GUI アプリ
 5. 開発ツール
 6. 独自 hardware module
@@ -429,7 +429,7 @@ passwd admin  # 必要に応じて
 ```
 
 あわせて以下を確認:
-- Niri・IronBar の起動確認
+- GUI / ウィンドウマネージャーの起動確認
 - fcitx5 での日本語入力確認
 - PipeWire による音声確認
 
@@ -447,7 +447,7 @@ passwd admin  # 必要に応じて
 | nix-auto-storage 設定 | `modules/hardware/hardware.nix` |
 | ホスト固有設定（GPU 種別等） | `modules/hosts/<hostname>/configuration.nix` |
 | 共通基盤（Nix・GC・ブート・locale・入力・音声） | `modules/software/base.nix` |
-| Plasma・SDDM・Niri・IronBar | `modules/software/gui/desktop/` |
+| Hyprland・greetd・Waybar | `modules/software/gui/desktop/` |
 | ゲーミング (Lutris/Wine) | `modules/software/gui/gaming/gaming.nix` |
 | 開発ツール（シェル・Direnv） | `modules/software/cui/programming/programming.nix` |
 | 言語ツールチェーン | `modules/software/cui/lang/lang.nix` |

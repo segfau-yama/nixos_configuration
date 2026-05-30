@@ -1,21 +1,20 @@
 { inputs, ... }:
 {
   imports = [
-    ./niri.nix
-    ./plasma.nix
+    ./hyprland.nix
   ];
 
-  # desktop: niri と Plasma を組み合わせた GUI デスクトップ環境。
+  # desktop: Hyprland Wayland デスクトップ環境。
   flake.modules.nixos.desktop = { ... }: {
     imports = with inputs.self.modules.nixos; [
-      desktopNiri
-      desktopPlasma
+      greeter
+      desktopHyprland
     ];
   };
 
   flake.modules.homeManager.desktop = { ... }: {
     imports = with inputs.self.modules.homeManager; [
-      desktopNiri
+      desktopHyprland
     ];
   };
 }

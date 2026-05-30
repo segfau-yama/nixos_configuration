@@ -30,7 +30,7 @@ in
   # jade (Home Manager): 最小限の GUI ユーザー設定 (desktop のみ)。
   flake.modules.homeManager."${username}" = { ... }: {
     imports = with inputs.self.modules.homeManager; [
-      desktop     # デスクトップ環境 (Niri/IronBar/mako/swww 統合)
+      desktop     # Hyprland ユーザー設定
     ];
 
     home.username    = "${username}";

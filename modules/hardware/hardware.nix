@@ -46,7 +46,7 @@
 
       # ── 共通: GUI / Wayland 用の Mesa/DRI 基盤 ────────────────────────────
       # VM の汎用GPU (none) でも Wayland 動作用の Mesa/DRI を有効化する。
-      # Niri などの Wayland コンポジターには Mesa/DRI が必要。
+      # Wayland コンポジターには Mesa/DRI が必要。
       (lib.mkIf (config.my.hardware.gpu == "none") {
         hardware.graphics.enable = true;
 
