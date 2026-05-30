@@ -436,11 +436,15 @@
 
       #volume,
       #network,
-      #battery,
       #tray,
+      #input-method,
       #power {
         color: #cba6f7;
         font-size: 17px;
+      }
+
+      #input-method {
+        color: #fab387;
       }
 
       #clock {

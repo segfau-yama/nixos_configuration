@@ -33,6 +33,10 @@
     };
     nix.optimise.automatic = true;
 
+    environment.systemPackages = with pkgs; [
+      git
+    ];
+
     networking.networkmanager.enable = true;
     services.resolved = {
       enable = true;
