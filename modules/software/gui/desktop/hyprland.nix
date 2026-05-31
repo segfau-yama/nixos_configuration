@@ -118,14 +118,15 @@
       history = true
 
       width = 620
-      height = 420
+      height = 500
       anchor = center
       exclusive-zone = -1
+      scale = false
       corner-radius = 14
       outline-width = 0
       border-width = 1
       border-color = #cba6f738
-      background-color = #11111beb
+      background-color = #11111bf2
 
       padding-top = 14
       padding-bottom = 14
@@ -135,16 +136,16 @@
 
       prompt-text = "󰣇 "
       prompt-color = #cba6f7
-      prompt-background = #31324499
-      prompt-background-padding = 10, 10, 10, 16
+      prompt-background = #313244cc
+      prompt-background-padding = 10, 4, 10, 16
       prompt-background-corner-radius = 10
-      prompt-padding = 10
+      prompt-padding = 0
 
       placeholder-text = "Search..."
       placeholder-color = #6c7086
       input-color = #cdd6f4
-      input-background = #31324499
-      input-background-padding = 10, 16
+      input-background = #313244cc
+      input-background-padding = 10, -1, 10, 0
       input-background-corner-radius = 10
 
       default-result-color = #bac2de
