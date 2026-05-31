@@ -70,7 +70,7 @@
       slurp
       wl-clipboard
       wlsunset
-      wofi
+      tofi
       xfce.thunar
     ];
   };
@@ -93,7 +93,7 @@
       polkit_gnome
       wl-clipboard
       wlsunset
-      wofi
+      tofi
       xfce.thunar
     ];
 
@@ -105,12 +105,74 @@
       };
     };
 
+    xdg.configFile."tofi/config".text = ''
+      font = "Inter"
+      font-size = 13
+      text-color = #cdd6f4
+      text-cursor = true
+      text-cursor-style = bar
+      text-cursor-color = #cba6f7
+      terminal = foot
+      drun-launch = true
+      matching-algorithm = fuzzy
+      history = true
+
+      width = 620
+      height = 420
+      anchor = center
+      exclusive-zone = -1
+      corner-radius = 14
+      outline-width = 0
+      border-width = 1
+      border-color = #cba6f738
+      background-color = #11111beb
+
+      padding-top = 14
+      padding-bottom = 14
+      padding-left = 14
+      padding-right = 14
+      clip-to-padding = false
+
+      prompt-text = "󰣇 "
+      prompt-color = #cba6f7
+      prompt-background = #31324499
+      prompt-background-padding = 10, 10, 10, 16
+      prompt-background-corner-radius = 10
+      prompt-padding = 10
+
+      placeholder-text = "Search..."
+      placeholder-color = #6c7086
+      input-color = #cdd6f4
+      input-background = #31324499
+      input-background-padding = 10, 16
+      input-background-corner-radius = 10
+
+      default-result-color = #bac2de
+      default-result-background = #00000000
+      default-result-background-padding = 8, 12
+      default-result-background-corner-radius = 9
+
+      alternate-result-color = #bac2de
+      alternate-result-background = #00000000
+      alternate-result-background-padding = 8, 12
+      alternate-result-background-corner-radius = 9
+
+      selection-color = #cba6f7
+      selection-background = #cba6f73d
+      selection-background-padding = 8, 12
+      selection-background-corner-radius = 9
+      selection-match-color = #89b4fa
+
+      result-spacing = 3
+      num-results = 8
+    '';
+
     xdg.configFile."hypr/hyprland.conf".text = ''
       monitor=,preferred,auto,1.0
 
       $terminal = foot
       $fileManager = thunar
-      $menu = wofi --show drun
+      $menu = tofi-drun --drun-launch=true
 
       exec-once = fcitx5 -d
       exec-once = mako
@@ -341,7 +403,7 @@
             "type": "label",
             "name": "launcher",
             "label": "󰣇",
-            "on_click_left": "wofi --show drun"
+            "on_click_left": "tofi-drun --drun-launch=true"
           },
           {
             "type": "volume",
