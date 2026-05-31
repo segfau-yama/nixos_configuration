@@ -128,43 +128,43 @@
       border-color = #cba6f738
       background-color = #11111bf2
 
-      padding-top = 14
-      padding-bottom = 14
-      padding-left = 14
-      padding-right = 14
-      clip-to-padding = false
+      padding-top = 18
+      padding-bottom = 18
+      padding-left = 18
+      padding-right = 18
+      clip-to-padding = true
 
       prompt-text = "󰣇 "
       prompt-color = #cba6f7
-      prompt-background = #313244cc
-      prompt-background-padding = 6, 4, 6, 16
-      prompt-background-corner-radius = 8
-      prompt-padding = 0
+      prompt-background = #00000000
+      prompt-background-padding = 0
+      prompt-background-corner-radius = 0
+      prompt-padding = 0, 10, 0, 0
 
       placeholder-text = "Search..."
       placeholder-color = #6c7086
       input-color = #cdd6f4
       input-background = #313244cc
-      input-background-padding = 6, -1, 6, 0
+      input-background-padding = 8, 14, 8, 14
       input-background-corner-radius = 8
 
       default-result-color = #bac2de
       default-result-background = #00000000
-      default-result-background-padding = 4, 12
+      default-result-background-padding = 6, 12
       default-result-background-corner-radius = 8
 
       alternate-result-color = #bac2de
       alternate-result-background = #00000000
-      alternate-result-background-padding = 4, 12
+      alternate-result-background-padding = 6, 12
       alternate-result-background-corner-radius = 8
 
       selection-color = #cba6f7
       selection-background = #cba6f733
-      selection-background-padding = 3, 12
+      selection-background-padding = 6, 12
       selection-background-corner-radius = 8
       selection-match-color = #89b4fa
 
-      result-spacing = 6
+      result-spacing = 8
       num-results = 8
     '';
 
