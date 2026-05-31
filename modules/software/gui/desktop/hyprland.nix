@@ -53,15 +53,18 @@
     };
 
     environment.systemPackages = with pkgs; [
+      adwaita-icon-theme
       brightnessctl
       cliphist
       foot
       grim
+      hicolor-icon-theme
       hypridle
       hyprpaper
       hyprshot
       ironbar
       mako
+      papirus-icon-theme
       playerctl
       polkit_gnome
       slurp
@@ -75,14 +78,17 @@
   # desktopHyprland (Home Manager): suichan の Hyprland 設定。
   flake.modules.homeManager.desktopHyprland = { pkgs, ... }: {
     home.packages = with pkgs; [
+      adwaita-icon-theme
       brightnessctl
       cliphist
       foot
+      hicolor-icon-theme
       hypridle
       hyprpaper
       hyprshot
       ironbar
       mako
+      papirus-icon-theme
       playerctl
       polkit_gnome
       wl-clipboard
@@ -90,6 +96,14 @@
       wofi
       xfce.thunar
     ];
+
+    gtk = {
+      enable = true;
+      iconTheme = {
+        name = "Papirus-Dark";
+        package = pkgs.papirus-icon-theme;
+      };
+    };
 
     xdg.configFile."hypr/hyprland.conf".text = ''
       monitor=,preferred,auto,1.0
@@ -301,6 +315,7 @@
 
     xdg.configFile."ironbar/config.json".text = ''
       {
+        "icon_theme": "Papirus-Dark",
         "position": "top",
         "anchor_to_edges": true,
         "height": 36,
@@ -340,7 +355,7 @@
           {
             "type": "tray",
             "icon_size": 16,
-            "prefer_theme_icons": false
+            "prefer_theme_icons": true
           },
           {
             "type": "label",
