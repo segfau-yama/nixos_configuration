@@ -56,12 +56,9 @@
       adwaita-icon-theme
       brightnessctl
       cliphist
-      foot
-      grim
       hicolor-icon-theme
       hypridle
       hyprpaper
-      hyprshot
       ironbar
       mako
       papirus-icon-theme
@@ -71,21 +68,35 @@
       wl-clipboard
       wlsunset
       tofi
-      xfce.thunar
+      wayshot
+      wezterm
+      yazi
     ];
   };
 
   # desktopHyprland (Home Manager): suichan の Hyprland 設定。
-  flake.modules.homeManager.desktopHyprland = { pkgs, ... }: {
+  flake.modules.homeManager.desktopHyprland = { pkgs, ... }:
+  let
+    screenshotRegion = pkgs.writeShellScript "wayshot-region" ''
+      ${pkgs.coreutils}/bin/mkdir -p "$HOME/Pictures/Screenshots"
+      exec ${pkgs.wayshot}/bin/wayshot "$HOME/Pictures/Screenshots/region-$(${pkgs.coreutils}/bin/date +%Y%m%d-%H%M%S).png" -g
+    '';
+    screenshotWindow = pkgs.writeShellScript "wayshot-window" ''
+      ${pkgs.coreutils}/bin/mkdir -p "$HOME/Pictures/Screenshots"
+      exec ${pkgs.wayshot}/bin/wayshot "$HOME/Pictures/Screenshots/window-$(${pkgs.coreutils}/bin/date +%Y%m%d-%H%M%S).png" --choose-toplevel
+    '';
+    screenshotOutput = pkgs.writeShellScript "wayshot-output" ''
+      ${pkgs.coreutils}/bin/mkdir -p "$HOME/Pictures/Screenshots"
+      exec ${pkgs.wayshot}/bin/wayshot "$HOME/Pictures/Screenshots/output-$(${pkgs.coreutils}/bin/date +%Y%m%d-%H%M%S).png"
+    '';
+  in {
     home.packages = with pkgs; [
       adwaita-icon-theme
       brightnessctl
       cliphist
-      foot
       hicolor-icon-theme
       hypridle
       hyprpaper
-      hyprshot
       ironbar
       mako
       papirus-icon-theme
@@ -94,7 +105,9 @@
       wl-clipboard
       wlsunset
       tofi
-      xfce.thunar
+      wayshot
+      wezterm
+      yazi
     ];
 
     gtk = {
@@ -112,7 +125,7 @@
       text-cursor = true
       text-cursor-style = bar
       text-cursor-color = #cba6f7
-      terminal = foot
+      terminal = wezterm start --
       drun-launch = true
       matching-algorithm = fuzzy
       history = true
@@ -171,8 +184,8 @@
     xdg.configFile."hypr/hyprland.conf".text = ''
       monitor=,preferred,auto,1.0
 
-      $terminal = foot
-      $fileManager = thunar
+      $terminal = wezterm
+      $fileManager = wezterm start -- yazi
       $menu = tofi-drun --drun-launch=true
 
       exec-once = fcitx5 -d
@@ -292,15 +305,15 @@
       bind = $mainMod, V, togglefloating,
       bind = $mainMod, F, fullscreen,
       bind = $mainMod, R, exec, $menu
-      bind = $mainMod, P, exec, hyprshot -m region
+      bind = $mainMod, P, exec, ${screenshotRegion}
       bind = $mainMod, J, layoutmsg, togglesplit
       bind = $mainMod, D, exec, $menu
       bind = SUPER SHIFT, right, movetoworkspace, +1
       bind = SUPER SHIFT, left, movetoworkspace, -1
 
-      bind = , Print, exec, hyprshot -m region
-      bind = alt, Print, exec, hyprshot -m window
-      bind = control, Print, exec, hyprshot -m output
+      bind = , Print, exec, ${screenshotRegion}
+      bind = alt, Print, exec, ${screenshotWindow}
+      bind = control, Print, exec, ${screenshotOutput}
 
       bind = $mainMod, left, movefocus, l
       bind = $mainMod, right, movefocus, r
