@@ -302,6 +302,7 @@
     xdg.configFile."ironbar/config.json".text = ''
       {
         "position": "top",
+        "anchor_to_edges": false,
         "height": 42,
         "margin": {
           "top": 6,
@@ -311,21 +312,13 @@
         "start": [
           {
             "type": "workspaces",
-            "format": {
-              "named": "{name}",
-              "unnamed": "{name}"
-            },
-            "sort": "name"
+            "format": "{name}"
           }
         ],
         "center": [
           {
             "type": "focused",
-            "show_icon": false,
-            "truncate": {
-              "mode": "end",
-              "max_length": 60
-            }
+            "show_icon": false
           }
         ],
         "end": [
@@ -337,25 +330,7 @@
           },
           {
             "type": "volume",
-            "format": "{icon}",
-            "icons": {
-              "volume": "󰕾",
-              "muted": "󰝟"
-            },
-            "profiles": {
-              "medium": {
-                "when": 66.66,
-                "icons": {
-                  "volume": "󰖀"
-                }
-              },
-              "low": {
-                "when": 33.33,
-                "icons": {
-                  "volume": "󰕿"
-                }
-              }
-            }
+            "format": "{icon}"
           },
           {
             "type": "label",
@@ -397,11 +372,20 @@
         min-width: 0;
       }
 
+      #bar {
+        background: transparent;
+        border-radius: 14px;
+      }
+
+      #bar,
+      .background {
+        border-radius: 14px;
+      }
+
       .background {
         background: rgba(17, 17, 27, 0.7);
         color: #edf6f4;
         border-bottom: 1px solid rgba(203, 166, 247, 0.15);
-        border-radius: 14px;
       }
 
       tooltip,
