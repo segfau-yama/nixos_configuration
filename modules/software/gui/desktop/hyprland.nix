@@ -339,7 +339,8 @@
           },
           {
             "type": "tray",
-            "icon_size": 16
+            "icon_size": 16,
+            "prefer_theme_icons": false
           },
           {
             "type": "label",
@@ -458,10 +459,10 @@
       }
 
       .workspaces .item {
-        padding: 0 13px;
+        padding: 0 8px;
         margin: 4px 2px;
         min-height: 24px;
-        min-width: 32px;
+        min-width: 22px;
         border-radius: 9px;
         border: none;
         background: transparent;
@@ -531,6 +532,18 @@
         border-radius: 8px;
         background: transparent;
         background-image: none;
+      }
+
+      .tray .item label {
+        font-size: 0;
+        min-width: 0;
+        margin: 0;
+        padding: 0;
+      }
+
+      .tray .item image {
+        min-width: 16px;
+        min-height: 16px;
       }
 
       .tray .item.urgent {
