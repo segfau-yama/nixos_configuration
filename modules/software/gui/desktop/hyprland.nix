@@ -121,7 +121,7 @@
       height = 500
       anchor = center
       exclusive-zone = -1
-      scale = false
+      scale = true
       corner-radius = 14
       outline-width = 0
       border-width = 1
@@ -134,37 +134,37 @@
       padding-right = 18
       clip-to-padding = true
 
-      prompt-text = "󰣇 "
+      prompt-text = "> "
       prompt-color = #cba6f7
       prompt-background = #00000000
       prompt-background-padding = 0
       prompt-background-corner-radius = 0
-      prompt-padding = 0, 10, 0, 0
+      prompt-padding = 10
 
       placeholder-text = "Search..."
       placeholder-color = #6c7086
       input-color = #cdd6f4
-      input-background = #313244cc
-      input-background-padding = 8, 14, 8, 14
-      input-background-corner-radius = 8
+      input-background = #00000000
+      input-background-padding = 0
+      input-background-corner-radius = 0
 
       default-result-color = #bac2de
       default-result-background = #00000000
-      default-result-background-padding = 6, 12
-      default-result-background-corner-radius = 8
+      default-result-background-padding = 0
+      default-result-background-corner-radius = 0
 
       alternate-result-color = #bac2de
       alternate-result-background = #00000000
-      alternate-result-background-padding = 6, 12
-      alternate-result-background-corner-radius = 8
+      alternate-result-background-padding = 0
+      alternate-result-background-corner-radius = 0
 
       selection-color = #cba6f7
       selection-background = #cba6f733
-      selection-background-padding = 6, 12
+      selection-background-padding = 2, 12
       selection-background-corner-radius = 8
       selection-match-color = #89b4fa
 
-      result-spacing = 8
+      result-spacing = 14
       num-results = 8
     '';
 
