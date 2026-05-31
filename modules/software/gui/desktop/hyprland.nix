@@ -56,6 +56,7 @@
       adwaita-icon-theme
       brightnessctl
       cliphist
+      foot
       hicolor-icon-theme
       hypridle
       hyprpaper
@@ -64,10 +65,10 @@
       papirus-icon-theme
       playerctl
       polkit_gnome
+      rofi-wayland
       slurp
       wl-clipboard
       wlsunset
-      tofi
       wayshot
       wezterm
       yazi
@@ -94,6 +95,7 @@
       adwaita-icon-theme
       brightnessctl
       cliphist
+      foot
       hicolor-icon-theme
       hypridle
       hyprpaper
@@ -102,9 +104,9 @@
       papirus-icon-theme
       playerctl
       polkit_gnome
+      rofi-wayland
       wl-clipboard
       wlsunset
-      tofi
       wayshot
       wezterm
       yazi
@@ -118,67 +120,229 @@
       };
     };
 
-    xdg.configFile."tofi/config".text = ''
-      font = "Inter"
-      font-size = 13
-      text-color = #cdd6f4
-      text-cursor = true
-      text-cursor-style = bar
-      text-cursor-color = #cba6f7
-      terminal = wezterm start --
-      drun-launch = true
-      matching-algorithm = fuzzy
-      history = true
+    xdg.configFile."rofi/config.rasi".text = ''
+      configuration {
+          modi:                "drun,run,window";
+          show-icons:          true;
+          icon-theme:          "Papirus-Dark,hicolor";
+          display-drun:        "󰣇";
+          display-run:         "󰆍";
+          display-window:      "󰖯";
+          drun-display-format: "{name}";
+          terminal:            "foot";
+          font:                "Inter 13";
+      }
 
-      width = 620
-      height = 500
-      anchor = center
-      exclusive-zone = -1
-      scale = true
-      corner-radius = 14
-      outline-width = 0
-      border-width = 1
-      border-color = #cba6f738
-      background-color = #11111bf2
+      @theme "~/.config/rofi/themes/catppuccin-mocha-purple.rasi"
+    '';
 
-      padding-top = 18
-      padding-bottom = 18
-      padding-left = 18
-      padding-right = 18
-      clip-to-padding = true
+    xdg.configFile."rofi/themes/catppuccin-mocha-purple.rasi".text = ''
+      // ============================================================
+      // Catppuccin Mocha Purple — Rofi Theme
+      // Designed to match Hyprland + Waybar Catppuccin Mocha setup
+      // ============================================================
 
-      prompt-text = "> "
-      prompt-color = #cba6f7
-      prompt-background = #00000000
-      prompt-background-padding = 0
-      prompt-background-corner-radius = 0
-      prompt-padding = 10
+      * {
+          // ── Catppuccin Mocha Palette ──────────────────────────
+          crust:       #11111b;
+          base:        #1e1e2e;
+          surface0:    #313244;
+          surface1:    #45475a;
+          surface2:    #585b70;
+          overlay0:    #6c7086;
+          text:        #cdd6f4;
+          subtext1:    #bac2de;
+          subtext0:    #a6adc8;
+          mauve:       #cba6f7;
+          blue:        #89b4fa;
+          pink:        #f38ba8;
+          green:       #a6e3a1;
 
-      placeholder-text = "Search..."
-      placeholder-color = #6c7086
-      input-color = #cdd6f4
-      input-background = #00000000
-      input-background-padding = 0
-      input-background-corner-radius = 0
+          // ── Semantic aliases ──────────────────────────────────
+          bg:           @crust;
+          bg-alt:       @base;
+          bg-surface:   @surface0;
+          fg:           @text;
+          fg-dim:       @subtext1;
+          fg-faint:     @overlay0;
+          accent:       @mauve;
+          urgent-color: @pink;
 
-      default-result-color = #bac2de
-      default-result-background = #00000000
-      default-result-background-padding = 0
-      default-result-background-corner-radius = 0
+          // ── Defaults ─────────────────────────────────────────
+          background-color: transparent;
+          text-color:       @fg;
+      }
 
-      alternate-result-color = #bac2de
-      alternate-result-background = #00000000
-      alternate-result-background-padding = 0
-      alternate-result-background-corner-radius = 0
+      // ── Window ───────────────────────────────────────────────────
+      window {
+          background-color: rgba(17, 17, 27, 0.92);
+          border:           1px;
+          border-color:     rgba(203, 166, 247, 0.22);
+          border-radius:    14px;
+          padding:          14px;
+          width:            620px;
+          location:         center;
+          x-offset:         0;
+          y-offset:         0;
+      }
 
-      selection-color = #cba6f7
-      selection-background = #cba6f733
-      selection-background-padding = 2, 12
-      selection-background-corner-radius = 8
-      selection-match-color = #89b4fa
+      // ── Layout ───────────────────────────────────────────────────
+      mainbox {
+          background-color: transparent;
+          children:         [inputbar, listview, mode-switcher];
+          spacing:          10px;
+          padding:          0;
+      }
 
-      result-spacing = 14
-      num-results = 8
+      // ── Search bar ───────────────────────────────────────────────
+      inputbar {
+          background-color: rgba(49, 50, 68, 0.60);
+          border:           1px;
+          border-color:     rgba(203, 166, 247, 0.16);
+          border-radius:    10px;
+          padding:          10px 16px;
+          children:         [prompt, entry];
+          spacing:          10px;
+      }
+
+      prompt {
+          background-color: transparent;
+          text-color:       @accent;
+          vertical-align:   0.5;
+      }
+
+      entry {
+          background-color: transparent;
+          text-color:       @fg;
+          placeholder:      "Search...";
+          placeholder-color: @fg-faint;
+          vertical-align:   0.5;
+          cursor-color:     @accent;
+      }
+
+      // ── Results ──────────────────────────────────────────────────
+      listview {
+          background-color: transparent;
+          lines:            8;
+          columns:          1;
+          spacing:          3px;
+          padding:          2px 0;
+          scrollbar:        false;
+          border:           none;
+          cycle:            true;
+      }
+
+      element {
+          background-color: transparent;
+          border-radius:    9px;
+          padding:          8px 12px;
+          spacing:          12px;
+          orientation:      horizontal;
+          children:         [element-icon, element-text];
+          cursor:           pointer;
+      }
+
+      // Normal items
+      element.normal.normal {
+          background-color: transparent;
+          text-color:       @fg-dim;
+      }
+      element.normal.active {
+          background-color: rgba(203, 166, 247, 0.10);
+          text-color:       @accent;
+      }
+      element.normal.urgent {
+          background-color: rgba(243, 139, 168, 0.10);
+          text-color:       @urgent-color;
+      }
+
+      // Selected (highlighted) item
+      element.selected.normal {
+          background-color: rgba(203, 166, 247, 0.24);
+          text-color:       @accent;
+      }
+      element.selected.active {
+          background-color: rgba(203, 166, 247, 0.24);
+          text-color:       @accent;
+      }
+      element.selected.urgent {
+          background-color: rgba(243, 139, 168, 0.24);
+          text-color:       @urgent-color;
+      }
+
+      // Alternating items
+      element.alternate.normal {
+          background-color: transparent;
+          text-color:       @fg-dim;
+      }
+      element.alternate.active {
+          background-color: transparent;
+          text-color:       @accent;
+      }
+      element.alternate.urgent {
+          background-color: transparent;
+          text-color:       @urgent-color;
+      }
+
+      element-icon {
+          background-color: transparent;
+          size:             24px;
+          cursor:           inherit;
+      }
+
+      element-text {
+          background-color: transparent;
+          text-color:       inherit;
+          vertical-align:   0.5;
+          cursor:           inherit;
+      }
+
+      // ── Mode switcher (drun / run / window) ──────────────────────
+      mode-switcher {
+          background-color: transparent;
+          spacing:          8px;
+          padding:          2px 0 0 0;
+          border:           1px 0px 0px 0px;
+          border-color:     rgba(203, 166, 247, 0.10);
+      }
+
+      button {
+          background-color: rgba(49, 50, 68, 0.45);
+          text-color:       @fg-faint;
+          border-radius:    8px;
+          padding:          4px 16px;
+          cursor:           pointer;
+      }
+
+      button.selected {
+          background-color: rgba(203, 166, 247, 0.24);
+          text-color:       @accent;
+      }
+
+      // ── Scrollbar ────────────────────────────────────────────────
+      scrollbar {
+          background-color: rgba(49, 50, 68, 0.40);
+          handle-color:     rgba(203, 166, 247, 0.50);
+          handle-width:     4px;
+          border-radius:    2px;
+          width:            6px;
+          padding:          2px;
+      }
+
+      // ── Message area ─────────────────────────────────────────────
+      message {
+          background-color: rgba(49, 50, 68, 0.40);
+          border:           1px;
+          border-color:     rgba(203, 166, 247, 0.12);
+          border-radius:    9px;
+          padding:          8px 14px;
+          margin:           0 0 4px 0;
+      }
+
+      textbox {
+          background-color: transparent;
+          text-color:       @fg-dim;
+      }
     '';
 
     xdg.configFile."hypr/hyprland.conf".text = ''
@@ -186,7 +350,7 @@
 
       $terminal = wezterm
       $fileManager = wezterm start -- yazi
-      $menu = tofi-drun --drun-launch=true
+      $menu = rofi -show drun
 
       exec-once = fcitx5 -d
       exec-once = mako
@@ -417,7 +581,7 @@
             "type": "label",
             "name": "launcher",
             "label": "󰣇",
-            "on_click_left": "tofi-drun --drun-launch=true"
+            "on_click_left": "rofi -show drun"
           },
           {
             "type": "volume",
