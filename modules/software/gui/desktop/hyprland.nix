@@ -302,7 +302,7 @@
     xdg.configFile."ironbar/config.json".text = ''
       {
         "position": "top",
-        "anchor_to_edges": false,
+        "anchor_to_edges": true,
         "height": 42,
         "margin": {
           "top": 6,
