@@ -30,6 +30,7 @@ in
   # suichan (Home Manager): Hyprland ユーザー設定。
   flake.modules.homeManager."${username}" = { ... }: {
     imports = with inputs.self.modules.homeManager; [
+      base
       desktop
     ];
 

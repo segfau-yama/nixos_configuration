@@ -100,4 +100,17 @@
       wireplumber.enable = true;
     };
   };
+
+  # base (Home Manager): 全ユーザー共通の基本ユーザー環境。
+  flake.modules.homeManager.base = { ... }: {
+    programs.zsh = {
+      enable                    = true;
+      autosuggestion.enable     = true;  # 履歴ベースの補完候補をグレーで表示
+      syntaxHighlighting.enable = true;  # コマンド入力時のシンタックスハイライト
+      history = {
+        size  = 10000;
+        share = true;  # 複数端末で履歴を共有
+      };
+    };
+  };
 }
