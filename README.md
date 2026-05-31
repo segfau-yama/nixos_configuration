@@ -72,10 +72,12 @@ nixos_configuration/
     │       └── cli-tools/       # git・xh・jaq・just・pkg-config
     │
     ├── users/
+    │   ├── jade/
+    │   │   └── jade.nix         # jade-cui/gui/gaming/develop デフォルトユーザー
     │   ├── suichan/
-    │   │   └── suichan.nix      # メインユーザー（GUI フルセット）
+    │   │   └── suichan.nix      # 旧メインユーザー
     │   └── admin/
-    │       └── admin.nix        # 管理者ユーザー
+    │       └── admin.nix        # 旧管理者ユーザー
     │
     ├── devshell.nix             # nix develop 用シェル（nixd・alejandra）
     └── flake-parts.nix          # flake-parts modules エクストラのインポート
@@ -92,10 +94,15 @@ nixos_configuration/
 | `base` | ブート・NM・Nix GC・stateVersion・unstable overlay・locale・fcitx5・audio |
 | `hardware` | GPU/CPU ドライバー・マイクロコード・nix-auto-storage（`my.hardware.*` オプション） |
 | `home-manager` | Home Manager NixOS 統合 |
-| `desktop` | Hyprland・greetd・polkit・seatd・XDG Portal・Ironbar |
+| `desktop` | Hyprland・Plasma・greetd・polkit・seatd・XDG Portal・Ironbar |
 | `programming` | nix-ld（パッチなし ELF バイナリ実行） |
-| `suichan` | suichan ユーザー定義 + HM 統合 |
-| `admin` | admin ユーザー定義 |
+| `jadeUsers` | jade-cui/gui/gaming/develop デフォルトユーザー定義 + HM 統合 |
+| `jade-cui` | CUI ユーザー定義 |
+| `jade-gui` | Hyprland GUI ユーザー定義 |
+| `jade-gaming` | Plasma ゲーム用ユーザー定義 |
+| `jade-develop` | Hyprland 開発用ユーザー定義 |
+| `suichan` | 旧 suichan ユーザー定義 + HM 統合 |
+| `admin` | 旧 admin ユーザー定義 |
 
 ### Home Manager モジュール（`modules.homeManager.*`）
 
@@ -113,7 +120,11 @@ nixos_configuration/
 | `kicad` | KiCad |
 | `freecad` | FreeCAD (Wayland)・MeshLab |
 | `zed` | Zed エディター（unstable チャンネル） |
-| `suichan` | suichan ユーザーの HM 設定（上記モジュールを組み合わせ） |
+| `jade-cui` | jade-cui の HM 設定（base） |
+| `jade-gui` | jade-gui の HM 設定（base + desktop） |
+| `jade-gaming` | jade-gaming の HM 設定（base + gaming） |
+| `jade-develop` | jade-develop の HM 設定（base + desktop + 開発ツール） |
+| `suichan` | 旧 suichan ユーザーの HM 設定 |
 
 ---
 
@@ -424,8 +435,10 @@ git diff
 ユーザーパスワードを設定します（TTY から root でログイン）。
 
 ```bash
-passwd suichan
-passwd admin  # 必要に応じて
+passwd jade-cui
+passwd jade-gui
+passwd jade-gaming
+passwd jade-develop
 ```
 
 あわせて以下を確認:
@@ -451,7 +464,7 @@ passwd admin  # 必要に応じて
 | ゲーミング (Lutris/Wine) | `modules/software/gui/gaming/gaming.nix` |
 | 開発ツール（シェル・Direnv） | `modules/software/cui/programming/programming.nix` |
 | 言語ツールチェーン | `modules/software/cui/lang/lang.nix` |
-| ユーザー設定（suichan） | `modules/users/suichan/suichan.nix` |
+| ユーザー設定（jade-*） | `modules/users/jade/jade.nix` |
 
 ### 2. 変更を Git に追加
 

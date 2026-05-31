@@ -1,21 +1,34 @@
 { ... }:
 {
-  # desktopHyprland (NixOS): Hyprland と greetd/tuigreet ログイン。
+  # desktopHyprland (NixOS): Hyprland / Plasma と greetd/tuigreet ログイン。
   flake.modules.nixos.desktopHyprland = { config, pkgs, ... }:
   let
-    desktopUser = "suichan";
-    hyprlandSessionForDesktopUser = pkgs.writeShellScript "hyprland-session-for-${desktopUser}" ''
+    jadeDesktopSession = pkgs.writeShellScript "jade-desktop-session" ''
       session_user="$(${pkgs.coreutils}/bin/id -un)"
-      if [ "$session_user" != "${desktopUser}" ]; then
-        printf '%s\n' 'This Hyprland session is configured only for suichan. Use a TTY for admin.'
-        ${pkgs.coreutils}/bin/sleep 3
-        exit 1
-      fi
 
-      exec ${config.programs.hyprland.package}/bin/Hyprland
+      case "$session_user" in
+        jade-gui|jade-develop)
+          exec ${config.programs.hyprland.package}/bin/Hyprland
+          ;;
+        jade-gaming)
+          exec ${pkgs.kdePackages.plasma-workspace}/bin/startplasma-wayland
+          ;;
+        jade-cui)
+          printf '%s\n' 'jade-cui is a CUI user. Use a TTY for this account.'
+          ${pkgs.coreutils}/bin/sleep 3
+          exit 1
+          ;;
+        *)
+          printf '%s\n' "No graphical session is configured for $session_user."
+          ${pkgs.coreutils}/bin/sleep 3
+          exit 1
+          ;;
+      esac
     '';
   in {
     hardware.graphics.enable = true;
+
+    services.desktopManager.plasma6.enable = true;
 
     programs.hyprland = {
       enable = true;
@@ -32,7 +45,7 @@
     services.greetd = {
       enable = true;
       settings.default_session = {
-        command = "${pkgs.greetd.tuigreet}/bin/tuigreet --time --cmd ${hyprlandSessionForDesktopUser}";
+        command = "${pkgs.greetd.tuigreet}/bin/tuigreet --time --cmd ${jadeDesktopSession}";
         user = "greeter";
       };
     };
@@ -75,8 +88,8 @@
     ];
   };
 
-  # desktopHyprland (Home Manager): suichan の Hyprland 設定。
-  flake.modules.homeManager.desktopHyprland = { pkgs, ... }:
+  # desktopHyprland (Home Manager): Hyprland ユーザー設定。
+  flake.modules.homeManager.desktopHyprland = { config, pkgs, ... }:
   let
     screenshotRegion = pkgs.writeShellScript "wayshot-region" ''
       ${pkgs.coreutils}/bin/mkdir -p "$HOME/Pictures/Screenshots"
@@ -534,8 +547,8 @@
     '';
 
     xdg.configFile."hypr/hyprpaper.conf".text = ''
-      preload = /home/suichan/Pictures/Wallpapers/cyber.png
-      wallpaper = HDMI-A-1,/home/suichan/Pictures/Wallpapers/cyber.png
+      preload = ${config.home.homeDirectory}/Pictures/Wallpapers/cyber.png
+      wallpaper = HDMI-A-1,${config.home.homeDirectory}/Pictures/Wallpapers/cyber.png
       splash = false
       ipc = on
     '';

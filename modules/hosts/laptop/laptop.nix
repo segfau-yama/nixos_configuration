@@ -5,8 +5,7 @@
       base
       home-manager
       desktop
-      suichan
-      admin
+      jadeUsers
     ] ++ [ "${inputs.self}/nixos/laptop/hardware-configuration.nix" ];
 
     networking.hostName = "laptop";

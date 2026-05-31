@@ -5,8 +5,7 @@
       base
       home-manager
       desktop
-      suichan
-      admin
+      jadeUsers
     ] ++ [ "${inputs.self}/nixos/virtual_machine/hardware-configuration.nix" ];
 
     networking.hostName = "virtual_machine";
