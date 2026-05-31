@@ -310,12 +310,22 @@
         },
         "start": [
           {
-            "type": "workspaces"
+            "type": "workspaces",
+            "format": {
+              "named": "{name}",
+              "unnamed": "{name}"
+            },
+            "sort": "name"
           }
         ],
         "center": [
           {
-            "type": "focused"
+            "type": "focused",
+            "show_icon": false,
+            "truncate": {
+              "mode": "end",
+              "max_length": 60
+            }
           }
         ],
         "end": [
@@ -327,7 +337,25 @@
           },
           {
             "type": "volume",
-            "format": "{icon}"
+            "format": "{icon}",
+            "icons": {
+              "volume": "󰕾",
+              "muted": "󰝟"
+            },
+            "profiles": {
+              "medium": {
+                "when": 66.66,
+                "icons": {
+                  "volume": "󰖀"
+                }
+              },
+              "low": {
+                "when": 33.33,
+                "icons": {
+                  "volume": "󰕿"
+                }
+              }
+            }
           },
           {
             "type": "label",
@@ -335,7 +363,8 @@
             "label": "{{3000:if nmcli -t -f STATE g 2>/dev/null | grep -q '^connected'; then if nmcli -t -f TYPE,STATE dev 2>/dev/null | grep -q '^ethernet:connected'; then echo '󰈀'; else echo '󰖩'; fi; else echo '󰖪'; fi}}"
           },
           {
-            "type": "tray"
+            "type": "tray",
+            "icon_size": 16
           },
           {
             "type": "label",
@@ -365,6 +394,7 @@
         font-size: 13px;
         font-weight: 600;
         min-height: 0;
+        min-width: 0;
       }
 
       .background {
@@ -382,50 +412,116 @@
         border-radius: 12px;
       }
 
-      .module {
+      tooltip label {
+        color: #cdd6f4;
+      }
+
+      button {
+        min-height: 0;
+        min-width: 0;
+        padding: 0;
+        border: none;
+        border-radius: 0;
+        background: transparent;
+        background-image: none;
+        box-shadow: none;
+        text-shadow: none;
+        color: inherit;
+      }
+
+      button:hover,
+      button:focus,
+      button:checked,
+      button:active {
+        border: none;
+        background-image: none;
+        box-shadow: none;
+        text-shadow: none;
+      }
+
+      #bar #start,
+      #bar #center,
+      #bar #end {
+        margin: 0 6px;
+      }
+
+      .widget-container {
+        min-height: 0;
+      }
+
+      .widget,
+      .label,
+      .volume,
+      .clock,
+      .tray {
         margin: 4px 1px;
         padding: 0 10px;
         border-radius: 9px;
         border: none;
         background: transparent;
+        background-image: none;
+        box-shadow: none;
         transition: background-color 0.2s ease, color 0.2s ease;
       }
 
-      .module:hover {
+      .widget:hover,
+      .label:hover,
+      .volume:hover,
+      .tray .item:hover {
         background: rgba(203, 166, 247, 0.12);
       }
 
-      #workspaces {
+      .workspaces {
         margin: 0;
         padding: 0 2px;
         background: transparent;
         border: none;
       }
 
-      #workspaces .item {
+      .workspaces .item {
         padding: 0 13px;
         margin: 5px 2px;
         min-height: 28px;
+        min-width: 34px;
         border-radius: 9px;
+        border: none;
         background: transparent;
+        background-image: none;
+        box-shadow: none;
         color: #6c7086;
         font-size: 13px;
         font-weight: 700;
       }
 
-      #workspaces .item:hover {
+      .workspaces .item:hover {
         background: rgba(203, 166, 247, 0.14);
         color: #cdd6f4;
       }
 
-      #workspaces .item.focused {
+      .workspaces .item.focused,
+      .workspaces .item.visible {
         background: rgba(203, 166, 247, 0.28);
         color: #cba6f7;
       }
 
-      #focused {
+      .workspaces .item.urgent {
+        background: rgba(243, 139, 168, 0.24);
+        color: #f38ba8;
+      }
+
+      .workspaces .item.inactive {
+        color: #45475a;
+      }
+
+      .focused {
         color: #bac2de;
         padding: 0 10px;
+      }
+
+      .focused .label {
+        margin: 0;
+        padding: 0;
+        background: transparent;
       }
 
       #launcher {
@@ -434,25 +530,49 @@
         padding: 0 12px;
       }
 
-      #volume,
+      .volume,
       #network,
-      #tray,
+      .tray,
       #input-method,
       #power {
         color: #cba6f7;
         font-size: 17px;
       }
 
+      .volume.muted {
+        color: #585b70;
+      }
+
+      .tray {
+        padding: 0 8px;
+      }
+
+      .tray .item {
+        padding: 0 4px;
+        margin: 0 1px;
+        border-radius: 8px;
+        background: transparent;
+        background-image: none;
+      }
+
+      .tray .item.urgent {
+        background: rgba(243, 139, 168, 0.22);
+      }
+
       #input-method {
         color: #fab387;
       }
 
-      #clock {
+      .clock {
         color: #cdd6f4;
         background: rgba(49, 50, 68, 0.65);
         border-radius: 9px;
         padding: 0 16px;
         margin: 4px 4px 4px 8px;
+      }
+
+      .clock:hover {
+        background: rgba(69, 71, 90, 0.8);
       }
     '';
   };
