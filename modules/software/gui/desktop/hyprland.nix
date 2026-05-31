@@ -149,21 +149,21 @@
 
       default-result-color = #bac2de
       default-result-background = #00000000
-      default-result-background-padding = 8, 12
-      default-result-background-corner-radius = 9
+      default-result-background-padding = 4, 12
+      default-result-background-corner-radius = 8
 
       alternate-result-color = #bac2de
       alternate-result-background = #00000000
-      alternate-result-background-padding = 8, 12
-      alternate-result-background-corner-radius = 9
+      alternate-result-background-padding = 4, 12
+      alternate-result-background-corner-radius = 8
 
       selection-color = #cba6f7
       selection-background = #cba6f73d
-      selection-background-padding = 8, 12
-      selection-background-corner-radius = 9
+      selection-background-padding = 4, 12
+      selection-background-corner-radius = 8
       selection-match-color = #89b4fa
 
-      result-spacing = 3
+      result-spacing = 6
       num-results = 8
     '';
 
