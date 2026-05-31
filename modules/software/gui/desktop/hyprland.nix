@@ -303,9 +303,9 @@
       {
         "position": "top",
         "anchor_to_edges": true,
-        "height": 42,
+        "height": 36,
         "margin": {
-          "top": 6,
+          "top": 4,
           "left": 8,
           "right": 8
         },
@@ -340,11 +340,6 @@
           {
             "type": "tray",
             "icon_size": 16
-          },
-          {
-            "type": "label",
-            "name": "input-method",
-            "label": "あ"
           },
           {
             "type": "label",
@@ -438,8 +433,8 @@
       .volume,
       .clock,
       .tray {
-        margin: 4px 1px;
-        padding: 0 10px;
+        margin: 3px 1px;
+        padding: 0 9px;
         border-radius: 9px;
         border: none;
         background: transparent;
@@ -464,9 +459,9 @@
 
       .workspaces .item {
         padding: 0 13px;
-        margin: 5px 2px;
-        min-height: 28px;
-        min-width: 34px;
+        margin: 4px 2px;
+        min-height: 24px;
+        min-width: 32px;
         border-radius: 9px;
         border: none;
         background: transparent;
@@ -499,7 +494,7 @@
 
       .focused {
         color: #bac2de;
-        padding: 0 10px;
+        padding: 0 9px;
       }
 
       .focused .label {
@@ -510,17 +505,16 @@
 
       #launcher {
         color: #cba6f7;
-        font-size: 18px;
-        padding: 0 12px;
+        font-size: 17px;
+        padding: 0 11px;
       }
 
       .volume,
       #network,
       .tray,
-      #input-method,
       #power {
         color: #cba6f7;
-        font-size: 17px;
+        font-size: 16px;
       }
 
       .volume.muted {
@@ -528,11 +522,11 @@
       }
 
       .tray {
-        padding: 0 8px;
+        padding: 0 7px;
       }
 
       .tray .item {
-        padding: 0 4px;
+        padding: 0 3px;
         margin: 0 1px;
         border-radius: 8px;
         background: transparent;
@@ -543,16 +537,12 @@
         background: rgba(243, 139, 168, 0.22);
       }
 
-      #input-method {
-        color: #fab387;
-      }
-
       .clock {
         color: #cdd6f4;
         background: rgba(49, 50, 68, 0.65);
         border-radius: 9px;
-        padding: 0 16px;
-        margin: 4px 4px 4px 8px;
+        padding: 0 14px;
+        margin: 3px 4px 3px 7px;
       }
 
       .clock:hover {
