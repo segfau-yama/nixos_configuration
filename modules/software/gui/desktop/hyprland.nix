@@ -137,16 +137,16 @@
       prompt-text = "󰣇 "
       prompt-color = #cba6f7
       prompt-background = #313244cc
-      prompt-background-padding = 10, 4, 10, 16
-      prompt-background-corner-radius = 10
+      prompt-background-padding = 6, 4, 6, 16
+      prompt-background-corner-radius = 8
       prompt-padding = 0
 
       placeholder-text = "Search..."
       placeholder-color = #6c7086
       input-color = #cdd6f4
       input-background = #313244cc
-      input-background-padding = 10, -1, 10, 0
-      input-background-corner-radius = 10
+      input-background-padding = 6, -1, 6, 0
+      input-background-corner-radius = 8
 
       default-result-color = #bac2de
       default-result-background = #00000000
@@ -159,8 +159,8 @@
       alternate-result-background-corner-radius = 8
 
       selection-color = #cba6f7
-      selection-background = #cba6f73d
-      selection-background-padding = 4, 12
+      selection-background = #cba6f733
+      selection-background-padding = 3, 12
       selection-background-corner-radius = 8
       selection-match-color = #89b4fa
 
