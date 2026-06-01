@@ -19,8 +19,6 @@
       swap = "/dev/vda3";
     };
 
-    my.capabilities.window_manager = "hyprland";
-
     console.keyMap = "us";
 
     boot.kernelParams = [

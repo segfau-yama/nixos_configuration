@@ -1,42 +1,32 @@
 { inputs, ... }:
 {
   # desktopHyprland (NixOS): Hyprland WM のシステム設定。
-  flake.modules.nixos.desktopHyprland = { config, lib, pkgs, ... }: {
-    config = lib.mkIf (config.my.capabilities.window_manager == "hyprland") {
-      hardware.graphics.enable = true;
+  flake.modules.nixos.desktopHyprland = { pkgs, ... }: {
+    hardware.graphics.enable = true;
 
-      programs.hyprland = {
-        enable = true;
-        xwayland.enable = true;
-      };
+    programs.hyprland = {
+      enable = true;
+      xwayland.enable = true;
+    };
 
-      programs.dconf.enable = true;
-      services.dbus.enable = true;
-      security.polkit.enable = true;
+    programs.dconf.enable = true;
+    services.dbus.enable = true;
+    security.polkit.enable = true;
 
-      environment.sessionVariables.NIXOS_OZONE_WL = "1";
+    environment.sessionVariables.NIXOS_OZONE_WL = "1";
 
-      services.greetd = {
-        enable = true;
-        settings.default_session = {
-          command = "${pkgs.greetd.tuigreet}/bin/tuigreet --time --cmd ${config.programs.hyprland.package}/bin/Hyprland";
-          user = "greeter";
-        };
-      };
-
-      xdg.portal = {
-        enable = true;
-        xdgOpenUsePortal = true;
-        extraPortals = with pkgs; [
-          xdg-desktop-portal-hyprland
-          xdg-desktop-portal-gtk
-        ];
-        config.hyprland = {
-          default = [ "hyprland" "gtk" ];
-          "org.freedesktop.impl.portal.FileChooser" = [ "gtk" ];
-          "org.freedesktop.portal.ScreenCast" = [ "hyprland" ];
-          "org.freedesktop.portal.Screenshot" = [ "hyprland" ];
-        };
+    xdg.portal = {
+      enable = true;
+      xdgOpenUsePortal = true;
+      extraPortals = with pkgs; [
+        xdg-desktop-portal-hyprland
+        xdg-desktop-portal-gtk
+      ];
+      config.hyprland = {
+        default = [ "hyprland" "gtk" ];
+        "org.freedesktop.impl.portal.FileChooser" = [ "gtk" ];
+        "org.freedesktop.portal.ScreenCast" = [ "hyprland" ];
+        "org.freedesktop.portal.Screenshot" = [ "hyprland" ];
       };
     };
   };
@@ -116,7 +106,11 @@
           bind = control, Print, exec, ${screenshotOutput}
         '';
 
-      xdg.configFile."hypr/hyprpaper.conf".source = ./hyprpaper.conf;
+      xdg.configFile."hypr/hyprpaper.conf".text =
+        builtins.replaceStrings
+          [ "@HOME@" ]
+          [ config.home.homeDirectory ]
+          (builtins.readFile ./hyprpaper.conf);
 
       xdg.configFile."hypr/hypridle.conf".text = ''
         general {

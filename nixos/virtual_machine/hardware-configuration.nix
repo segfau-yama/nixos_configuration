@@ -36,9 +36,11 @@ in
     fsType = "vfat";
   };
 
-  swapDevices = lib.mkForce [
-    { device = installDisk.swap; }
-  ];
+  swapDevices = lib.mkForce (
+    lib.optional (installDisk.swap != null && installDisk.swap != "") {
+      device = installDisk.swap;
+    }
+  );
 
   networking.useDHCP = lib.mkDefault true;
 

@@ -7,6 +7,8 @@ in
   flake.modules.nixos."${username}" = { pkgs, ... }: {
     imports = [ inputs.self.modules.nixos.desktopHyprland ];
 
+    my.desktop.hyprlandUsers = [ username ];
+
     users.users."${username}" = {
       isNormalUser = true;
       description = "Jade Develop";

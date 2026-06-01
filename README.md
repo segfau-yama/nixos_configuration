@@ -15,7 +15,7 @@
 | モジュール管理 | [flake-parts](https://github.com/hercules-ci/flake-parts) + [import-tree](https://github.com/vic/import-tree) |
 | ユーザー環境 | [Home Manager](https://github.com/nix-community/home-manager) |
 | チャンネル | nixpkgs-25.05 (stable) / nixos-unstable (一部パッケージ) |
-| デスクトップ | Hyprland + greetd/tuigreet |
+| デスクトップ | Hyprland / KDE Plasma + greetd/tuigreet |
 | 入力メソッド | fcitx5 + mozc |
 | 音声 | PipeWire + WirePlumber |
 
@@ -53,10 +53,9 @@ nixos_configuration/
     │       └── home-manager.nix # Home Manager NixOS 統合
     │
     ├── software/
-    │   ├── base.nix             # 共通基盤（Nix設定・locale・fcitx5・audio・ファイル/音量ツール）
-    │   │
-    │   ├── desktop/             # Hyprland・Plasma・greetd・XDG Portal
-    │   │
+    │   ├── base.nix             # 共通基盤（Nix設定・locale・fcitx5・audio・greetd dispatcher）
+    │   ├── hyprland/            # Hyprland・greetd 連携・XDG Portal・Ironbar
+    │   ├── plasma/              # KDE Plasma Wayland セッション
     │   ├── programming/         # CLI・言語ツール・Nushell・Direnv（GUI時のみZed）
     │   ├── browser/             # Chromium / w3m
     │   ├── media/               # GUI/TUI メディアツール
@@ -65,8 +64,6 @@ nixos_configuration/
     │   ├── gaming/              # Lutris・Wine・Winetricks
     │   ├── electronics/         # KiCad
     │   ├── mechanical/          # FreeCAD + MeshLab
-    │
-    │
     ├── users/
     │   ├── jade-core/
     │   │   └── jade-core.nix    # TUI/CUI プリセットユーザー
@@ -78,8 +75,6 @@ nixos_configuration/
     │   │   └── jade-develop.nix # Hyprland + development プリセットユーザー
     │   ├── jade-full/
     │   │   └── jade-full.nix    # Hyprland + full package プリセットユーザー
-    │   ├── suichan/
-    │   │   └── suichan.nix      # 旧メインユーザー
     │
     ├── devshell.nix             # nix develop 用シェル（nixd・alejandra）
     └── flake-parts.nix          # flake-parts modules エクストラのインポート
@@ -93,10 +88,9 @@ nixos_configuration/
 
 | モジュール名 | 役割 |
 |---|---|
-| `base` | ブート・NM・Nix GC・stateVersion・unstable overlay・locale・fcitx5・audio |
+| `base` | ブート・NM・Nix GC・stateVersion・unstable overlay・locale・fcitx5・audio・greetd dispatcher |
 | `hardware` | GPU/CPU ドライバー・マイクロコード・nix-auto-storage（`my.hardware.*` オプション） |
 | `home-manager` | Home Manager NixOS 統合 |
-| `desktop` | Hyprland・Plasma・greetd・polkit・seatd・XDG Portal |
 | `desktopHyprland` | Hyprland セッション基盤 |
 | `desktopPlasma` | KDE Plasma セッション基盤 |
 | `jade-core` | TUI/CUI ユーザー定義 |
@@ -104,7 +98,6 @@ nixos_configuration/
 | `jade-gaming` | Plasma ゲーム用ユーザー定義 |
 | `jade-develop` | Hyprland 開発用ユーザー定義 |
 | `jade-full` | Hyprland フルセットユーザー定義 |
-| `suichan` | 旧 suichan ユーザー定義 + HM 統合 |
 
 ### Home Manager モジュール（`modules.homeManager.*`）
 
@@ -114,10 +107,10 @@ nixos_configuration/
 | `desktopPlasma` | Plasma ユーザー用 DE フック |
 | `base` | zsh・capabilities・nix-index・devenv・nil・nixfmt-rfc-style・ファイル/音量ツール |
 | `programming` | Git・CLI ツール・Rust/Clang/Python・Nushell・Direnv・GUI時のみZed |
-| `browser` | Chromium |
+| `browser` | Chromium / w3m |
 | `gaming` | Lutris・Wine・Winetricks |
-| `media` | Spotify・mpv・oculante・playerctl |
-| `sns` | Discord |
+| `media` | Spotify・mpv・oculante・playerctl / TUI 時 mpv・yt-dlp |
+| `sns` | Discord / Weechat |
 | `office` | LibreOffice・Hunspell |
 | `electronics` | KiCad |
 | `mechanical` | FreeCAD (Wayland)・MeshLab |
@@ -126,7 +119,6 @@ nixos_configuration/
 | `jade-gaming` | jade-gaming の HM 設定（base + desktopPlasma + gaming） |
 | `jade-develop` | jade-develop の HM 設定（base + desktopHyprland + 開発/CAD ツール） |
 | `jade-full` | jade-full の HM 設定（base + desktopHyprland + 全用途ツール） |
-| `suichan` | 旧 suichan ユーザーの HM 設定 |
 
 ---
 
@@ -168,7 +160,6 @@ NixOS ライブ環境（インストール ISO 起動直後）では、まずネ
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/segfau-yama/nixos_configuration/main/setup.sh -o setup.sh
-vi setup.sh
 sudo bash setup.sh
 ```
 
@@ -183,29 +174,30 @@ sudo bash setup.sh
 > wpa_cli -i wlan0 scan_results
 > ```
 
-`setup.sh` 冒頭の設定ブロックを編集してから実行します。  
-`PROFILE` は編集不要で、実行中に `modules/hosts` から選択します（選択後 5 秒で自動開始、`Ctrl+C` で中断可能）。
+`PROFILE`、インストール先ディスク、boot/swap サイズは実行中に選択します。  
+破壊的なパーティション操作の直前に `INSTALL` の入力確認があります。
+
+必要な場合だけ環境変数で既定値を上書きできます。
 
 ```bash
-TARGET_DISK="/dev/vda"
-BOOT_PART=""      # 空なら TARGET_DISK から推定
-ROOT_PART=""      # 空なら TARGET_DISK から推定
-SWAP_PART=""      # 空なら TARGET_DISK から推定
-MOUNT_ROOT="/mnt"
-BOOT_END="512MiB"
-ROOT_END="100GiB"
-YES=true          # 実行前に true へ変更
-DRY_RUN=false
+REPO_URL="https://github.com/<user>/nixos_configuration.git" \
+TARGET_DISK="/dev/vda" \
+BOOT_SIZE="512MiB" \
+SWAP_SIZE="0" \
+sudo -E bash setup.sh
 ```
 
-動作確認だけしたい場合は、`DRY_RUN=true` に変更します。この場合、`install-args.nix` も作成されません。
+動作確認だけしたい場合は、`DRY_RUN=true` を使います。この場合、パーティション作成・ファイル生成・インストールは実行されません。
 
 このスクリプトが行うこと:
-1. GPT パーティション作成・フォーマット・マウント
-2. リポジトリを `/mnt/etc/nixos` に配置
-3. `nixos/<profile>/install-args.nix` に boot/root/swap の割り当てを書き出し、flake 評価に含める
-4. `nixos-generate-config --show-hardware-config` の結果を `nixos/<profile>/generated-hardware-configuration.nix` に書き出す
-5. `nixos-install --flake /mnt/etc/nixos#<profile>` を実行
+1. ネットワーク疎通を確認
+2. `modules/hosts` から flake profile を選択
+3. `lsblk` からインストール先ディスクを選択
+4. GPT パーティション作成・フォーマット・マウント
+5. リポジトリを `/mnt/etc/nixos` に配置
+6. `nixos/<profile>/install-args.nix` に boot/root/swap の割り当てを書き出し、flake 評価に含める
+7. `nixos-generate-config --show-hardware-config` の結果を `nixos/<profile>/generated-hardware-configuration.nix` に書き出す
+8. `nixos-install --flake /mnt/etc/nixos#<profile>` を実行
 
 ## 仮想マシンへのインストール
 
@@ -235,7 +227,6 @@ sudo -i
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/segfau-yama/nixos_configuration/main/setup.sh -o setup.sh
-vi setup.sh
 bash setup.sh
 ```
 
@@ -463,7 +454,8 @@ passwd jade-full
 | nix-auto-storage 設定 | `modules/hardware/hardware.nix` |
 | ホスト固有設定（GPU 種別等） | `modules/hosts/<hostname>/configuration.nix` |
 | 共通基盤（Nix・GC・ブート・locale・入力・音声） | `modules/software/base.nix` |
-| Hyprland・greetd・Ironbar | `modules/software/desktop/` |
+| Hyprland・greetd・Ironbar | `modules/software/hyprland/` |
+| KDE Plasma | `modules/software/plasma/plasma.nix` |
 | ゲーミング (Lutris/Wine) | `modules/software/gaming/gaming.nix` |
 | 開発ツール（シェル・Direnv） | `modules/software/programming/programming.nix` |
 | 言語ツールチェーン | `modules/software/programming/programming.nix` |

@@ -7,6 +7,8 @@ in
   flake.modules.nixos."${username}" = { pkgs, ... }: {
     imports = [ inputs.self.modules.nixos.desktopPlasma ];
 
+    my.desktop.plasmaUsers = [ username ];
+
     users.users."${username}" = {
       isNormalUser = true;
       description = "Jade Office";

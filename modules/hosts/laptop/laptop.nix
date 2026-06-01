@@ -19,8 +19,6 @@
       swap = "/dev/disk/by-label/swap";
     };
 
-    my.capabilities.window_manager = "hyprland";
-
     console.keyMap = "us";
   };
 }
