@@ -1,11 +1,6 @@
 { ... }:
 {
-  # programming (NixOS): nix-ld でパッチされていない ELF バイナリを実行可能にする。
-  flake.modules.nixos.programming = { ... }: {
-    programs.nix-ld.enable = true;
-  };
-
-  # programming (Home Manager): 開発用シェル補助設定 (Nushell / Direnv)。
+  # programming (Home Manager): シェル設定 (Zsh / Nushell / Direnv)。
   #
   # ログインシェルの Zsh 設定は base を参照する。
   # 言語ツールチェーンは lang、Nix ツールは nix-tools、

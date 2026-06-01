@@ -24,6 +24,8 @@
       trusted-users = [ "root" "@wheel" ];
     };
 
+    programs.nix-ld.enable = true;
+
     system.nixos.label = "tracked";
 
     nix.gc = {
