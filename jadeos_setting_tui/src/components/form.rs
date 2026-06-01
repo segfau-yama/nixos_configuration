@@ -27,6 +27,7 @@ pub enum FormFieldRole {
     Text,
     Choice,
     Toggle,
+    Log,
     ReadOnly,
 }
 
@@ -59,7 +60,7 @@ pub fn render_form_section(frame: &mut Frame, area: Rect, section: &FormSection)
     let field_heights = section
         .fields
         .iter()
-        .map(|field| if field.hint.is_some() { 4 } else { 3 })
+        .map(|field| field_height(field))
         .collect::<Vec<_>>();
     let (start, end) = visible_field_range(
         &field_heights,
@@ -124,10 +125,16 @@ fn render_field(
     is_active: bool,
     text_editing: bool,
 ) {
+    let input_height = if field.role == FormFieldRole::Log {
+        area.height
+            .saturating_sub(if field.hint.is_some() { 1 } else { 0 })
+    } else {
+        3
+    };
     let layout = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(3),
+            Constraint::Length(input_height),
             Constraint::Length(if field.hint.is_some() { 1 } else { 0 }),
         ])
         .split(area);
@@ -141,13 +148,20 @@ fn render_field(
 
     let value = display_value(&field.value);
     let cursor_offset = field.value.chars().count() as u16;
-    let value = Paragraph::new(Line::from(Span::styled(
-        value.clone(),
-        value_style(&value, field.role, is_active),
-    )))
-    .style(Style::default().fg(Color::Gray))
-    .wrap(Wrap { trim: false })
-    .block(block);
+    let value = if field.role == FormFieldRole::Log {
+        Paragraph::new(value.clone())
+            .style(value_style(&value, field.role, is_active))
+            .wrap(Wrap { trim: false })
+            .block(block)
+    } else {
+        Paragraph::new(Line::from(Span::styled(
+            value.clone(),
+            value_style(&value, field.role, is_active),
+        )))
+        .style(Style::default().fg(Color::Gray))
+        .wrap(Wrap { trim: false })
+        .block(block)
+    };
     frame.render_widget(value, layout[0]);
 
     if is_active && field.role == FormFieldRole::Text && text_editing {
@@ -173,6 +187,7 @@ fn field_title(field: &FormField, is_active: bool, text_editing: bool) -> Line<'
         FormFieldRole::Text => "input",
         FormFieldRole::Choice => "choice",
         FormFieldRole::Toggle => "toggle",
+        FormFieldRole::Log => "log",
         FormFieldRole::ReadOnly => "info",
     };
 
@@ -221,6 +236,7 @@ fn border_style(role: FormFieldRole, is_active: bool) -> Style {
         FormFieldRole::Text => Color::Blue,
         FormFieldRole::Choice => Color::Cyan,
         FormFieldRole::Toggle => Color::Magenta,
+        FormFieldRole::Log => Color::Green,
         FormFieldRole::ReadOnly => Color::DarkGray,
     };
 
@@ -252,6 +268,7 @@ fn value_style(value: &str, role: FormFieldRole, is_active: bool) -> Style {
         (FormFieldRole::Choice, "custom") => Style::default()
             .fg(Color::Yellow)
             .add_modifier(Modifier::BOLD),
+        (FormFieldRole::Log, _) => Style::default().fg(Color::Gray),
         (FormFieldRole::ReadOnly, _) => Style::default().fg(Color::Gray),
         _ => Style::default().fg(Color::Cyan),
     };
@@ -261,4 +278,14 @@ fn value_style(value: &str, role: FormFieldRole, is_active: bool) -> Style {
     } else {
         base
     }
+}
+
+fn field_height(field: &FormField) -> u16 {
+    if field.role == FormFieldRole::Log {
+        let line_count = field.value.lines().count().max(1) as u16;
+        let hint_height = if field.hint.is_some() { 1 } else { 0 };
+        return line_count.saturating_add(2).clamp(6, 18) + hint_height;
+    }
+
+    if field.hint.is_some() { 4 } else { 3 }
 }

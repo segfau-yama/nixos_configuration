@@ -407,10 +407,10 @@ pub fn screen_form_section(app: &App) -> FormSection {
                     FormFieldRole::ReadOnly,
                 ),
                 form_field(
-                    "latest log",
-                    latest_install_log(app),
-                    None,
-                    FormFieldRole::ReadOnly,
+                    "install log",
+                    install_log_tail(app, 12),
+                    Some("Most recent install steps and errors".to_string()),
+                    FormFieldRole::Log,
                 ),
             ],
             None,
@@ -427,10 +427,10 @@ pub fn screen_form_section(app: &App) -> FormSection {
                     FormFieldRole::ReadOnly,
                 ),
                 form_field(
-                    "latest log",
-                    latest_install_log(app),
-                    None,
-                    FormFieldRole::ReadOnly,
+                    "install log",
+                    install_log_tail(app, 14),
+                    Some("Use this log to identify the failed step".to_string()),
+                    FormFieldRole::Log,
                 ),
             ],
             None,
@@ -778,9 +778,11 @@ fn partition_layout(app: &App) -> String {
     }
 }
 
-fn latest_install_log(app: &App) -> String {
-    app.install_log
-        .last()
-        .cloned()
-        .unwrap_or_else(|| "no logs yet".to_string())
+fn install_log_tail(app: &App, lines: usize) -> String {
+    if app.install_log.is_empty() {
+        return "no logs yet".to_string();
+    }
+
+    let start = app.install_log.len().saturating_sub(lines);
+    app.install_log[start..].join("\n")
 }

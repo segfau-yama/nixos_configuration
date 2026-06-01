@@ -31,8 +31,12 @@ fn run_phase3_install_with_runner<R: CommandRunner>(
     if users.is_empty() {
         return Err("No interactive users configured.".to_string());
     }
+    logs.push(format!("preflight: target={}", config.device));
+    logs.push("preflight: checking root privileges".to_string());
     ensure_running_as_root(runner)?;
+    logs.push("preflight: checking target disk mounts".to_string());
     ensure_target_disk_is_not_mounted(config, runner)?;
+    logs.push("preflight: checks passed".to_string());
 
     logs.push(format!(
         "install start: host={}, target={}",
@@ -87,7 +91,7 @@ fn ensure_target_disk_is_not_mounted<R: CommandRunner>(
     runner: &R,
 ) -> Result<(), String> {
     let output = runner
-        .run("lsblk", &["-nr", "-o", "PKNAME,MOUNTPOINT", &config.device])
+        .run("lsblk", &["-nr", "-o", "NAME,MOUNTPOINT", &config.device])
         .map_err(|error| format!("preflight: failed to inspect target disk mounts: {error}"))?;
     if output.exit_code != 0 {
         return Err(format!(
@@ -673,12 +677,12 @@ mod tests {
     }
 
     #[test]
-    fn mounted_partitions_returns_parent_and_mountpoint_pairs() {
-        let output = "\n nvme1n1 /\nnvme1n1 /boot\nnvme1n1 \n";
+    fn mounted_partitions_returns_name_and_mountpoint_pairs() {
+        let output = "\n nvme1n1p1 /\nnvme1n1p2 /boot\nnvme1n1 \n";
 
         assert_eq!(
             mounted_partitions(output),
-            vec!["nvme1n1:/".to_string(), "nvme1n1:/boot".to_string()]
+            vec!["nvme1n1p1:/".to_string(), "nvme1n1p2:/boot".to_string()]
         );
     }
 
