@@ -113,8 +113,11 @@ impl Screen {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum UserMenuChoice {
-    Jade,
-    Admin,
+    JadeCore,
+    JadeOffice,
+    JadeGaming,
+    JadeDevelop,
+    JadeFull,
     Custom,
     Finish,
 }
@@ -122,9 +125,12 @@ pub enum UserMenuChoice {
 impl UserMenuChoice {
     pub(crate) fn from_index(index: usize) -> Self {
         match index {
-            0 => Self::Jade,
-            1 => Self::Admin,
-            2 => Self::Custom,
+            0 => Self::JadeCore,
+            1 => Self::JadeOffice,
+            2 => Self::JadeGaming,
+            3 => Self::JadeDevelop,
+            4 => Self::JadeFull,
+            5 => Self::Custom,
             _ => Self::Finish,
         }
     }
@@ -164,7 +170,7 @@ impl PendingUser {
             username: String::new(),
             display_name: String::new(),
             user_type: UserType::Gui,
-            programs: vec!["desktop".to_string()],
+            programs: Vec::new(),
             password: String::new(),
             password_confirm: String::new(),
             is_preset: false,

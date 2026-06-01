@@ -87,6 +87,9 @@ cat <<'EOF'
 Next steps:
   1) Reboot into installed system
   2) Set passwords:
-     passwd jade
-     passwd admin   # optional
+     passwd jade-core
+     passwd jade-office
+     passwd jade-gaming
+     passwd jade-develop
+     passwd jade-full
 EOF

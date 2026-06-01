@@ -31,16 +31,18 @@ audio="pipewire, wireplumber"
 keyboard="fcitx5-mozc, fcitx5-gtk, fcitx5-configtool"
 # i18n.defaultLocale="ja_JP.UTF-8", i18n.extraLocaleSettings LC_*=ja_JP.UTF-8, fonts.packages=[noto-fonts, noto-fonts-cjk-sans, noto-fonts-cjk-serif, noto-fonts-emoji, source-han-sans, source-han-serif]
 locale="noto-fonts, noto-fonts-cjk-sans, noto-fonts-cjk-serif, noto-fonts-emoji, source-han-sans, source-han-serif"
+# home.packages=[nil, devenv, nix-index, nixfmt-rfc-style]
+nix_tools="nil, devenv, nix-index, nixfmt-rfc-style"
 
 [software.users]
-# users=[admin,jade, other...]
+# users=[jade-core,jade-office,jade-gaming,jade-develop,jade-full, other...]
 # users are defined as sections under software.users with their specific software settings.
 
-[software.users.admin]
-# cui_user
-# users.users.admin.{isNormalUser=true, shell=zsh, extraGroups=["wheel","networkmanager","audio","video","input","seat"]}, programs.zsh.enable=true
+[software.users.jade-core]
+# tui_user
+# users.users.jade-core.{isNormalUser=true, shell=zsh, extraGroups=["wheel","networkmanager","audio","video","input","seat"]}, programs.zsh.enable=true
 
-[software.users.jade]
+[software.users.jade-full]
 # gui_user
 # programs.niri.enable=true, services.{greetd,seatd,dbus}.enable=true, xdg.portal.enable=true, programs.dconf.enable=true, security.polkit.enable=true
 desktop="ironbar, wl-clipboard, wayshot, wlsunset, swww, tofi, wezterm, pwvucontrol, pamixer"
@@ -52,8 +54,8 @@ media="spotify, mpv, oculante, playerctl"
 sns="discord"
 # home.packages=[lutris, wineWowPackages.stable, winetricks], programs.steam.{enable,remotePlay.openFirewall}=true, programs.gamemode.enable=true, hardware.graphics.enable32Bit=true
 gaming="lutris, wineWowPackages.stable, winetricks"
-# programs.nix-ld.enable=true, home.packages=[zed-editor(unstable), rustc, clang, mold, python3, git, nil, devenv, nix-index, nixfmt-rfc-style, xh, jaq, just, pkg-config], programs.{zsh,nushell,direnv,direnv.nix-direnv}.enable=true
-programming="zed-editor, rustc, clang, mold, python3, git, nil, devenv, nix-index, nixfmt-rfc-style, xh, jaq, just, pkg-config"
+# programs.nix-ld.enable=true, home.packages=[rustc, clang, mold, python3, git, xh, jaq, just, pkg-config] + GUI only [zed-editor(unstable)], programs.{zsh,nushell,direnv,direnv.nix-direnv}.enable=true
+programming="rustc, clang, mold, python3, git, xh, jaq, just, pkg-config, zed-editor(GUI only)"
 # home.packages=[kicad]
 electronics="kicad"
 # home.packages=[freecad-wayland, meshlab]
@@ -78,8 +80,8 @@ gaming="lutris, wineWowPackages.stable, winetricks"
 desktop="ironbar, wl-clipboard, wayshot, wlsunset, swww, tofi, wezterm, pwvucontrol, pamixer"
 # home.packages=[chromium], home.sessionVariables.NIXOS_OZONE_WL=1
 browser="chromium"
-# programs.nix-ld.enable=true, home.packages=[zed-editor(unstable), rustc, clang, mold, python3, git, nil, devenv, nix-index, nixfmt-rfc-style, xh, jaq, just, pkg-config], programs.{zsh,nushell,direnv,direnv.nix-direnv}.enable=true
-programming="zed-editor, rustc, clang, mold, python3, git, nil, devenv, nix-index, nixfmt-rfc-style, xh, jaq, just, pkg-config"
+# programs.nix-ld.enable=true, home.packages=[rustc, clang, mold, python3, git, xh, jaq, just, pkg-config] + GUI only [zed-editor(unstable)], programs.{zsh,nushell,direnv,direnv.nix-direnv}.enable=true
+programming="rustc, clang, mold, python3, git, xh, jaq, just, pkg-config, zed-editor(GUI only)"
 # home.packages=[kicad]
 electronics="kicad"
 # home.packages=[freecad-wayland, meshlab]
@@ -89,7 +91,7 @@ mechanical="freecad-wayland, meshlab"
 # other user settings...
 
 [pc1]
-# pc1 is a desktop with AMD CPU, AMD GPU, 1 storage, and has both admin and jade users with base software and jade's specific software settings.
+# pc1 is a desktop with AMD CPU, AMD GPU, 1 storage, and has jade-core and jade-full preset users.
 [pc1.hardware]
 cpu="amd"
 gpu="amd"
@@ -97,10 +99,10 @@ storage=1
 
 [pc1.software]
 base="base"
-users=["admin", "jade"]
+users=["jade-core", "jade-full"]
 
 [pc2]
-# pc2 is a desktop with AMD CPU, NVIDIA GPU, 2 storage, and has both admin and jade users with base software and jade's specific software settings.
+# pc2 is a desktop with AMD CPU, NVIDIA GPU, 2 storage, and has jade-gaming and jade-develop preset users.
 [pc2.hardware]
 cpu="amd"
 gpu="nvidia"
@@ -108,10 +110,10 @@ storage=2
 
 [pc2.software]
 base="base"
-users=["admin", "jade"]
+users=["jade-gaming", "jade-develop"]
 
 [pc3]
-# pc3 is a virtual machine with Intel CPU, Intel GPU, 1 storage, and has only admin user with base software settings.
+# pc3 is a virtual machine with Intel CPU, Intel GPU, 1 storage, and has only jade-core preset user.
 [pc3.hardware]
 cpu="intel"
 gpu="intel"
@@ -119,6 +121,4 @@ storage=1
 
 [pc3.software]
 base="base"
-users=["admin"]
-
-
+users=["jade-core"]

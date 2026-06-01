@@ -54,6 +54,7 @@ impl BootType {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum UserType {
     Gui,
+    Tui,
     Cui,
 }
 
@@ -61,6 +62,7 @@ impl UserType {
     pub fn label(self) -> &'static str {
         match self {
             Self::Gui => "gui",
+            Self::Tui => "tui",
             Self::Cui => "cui",
         }
     }

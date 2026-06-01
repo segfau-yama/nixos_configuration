@@ -4,8 +4,8 @@
     imports = with inputs.self.modules.nixos; [
       base
       home-manager
-      desktop
-      jadeUsers
+      jade-core
+      jade-full
     ] ++ [ "${inputs.self}/nixos/laptop/hardware-configuration.nix" ];
 
     networking.hostName = "laptop";
@@ -18,6 +18,8 @@
       root = "/dev/disk/by-label/nixos";
       swap = "/dev/disk/by-label/swap";
     };
+
+    my.capabilities.window_manager = "hyprland";
 
     console.keyMap = "us";
   };

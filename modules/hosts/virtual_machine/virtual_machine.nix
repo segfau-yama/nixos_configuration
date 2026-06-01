@@ -4,8 +4,8 @@
     imports = with inputs.self.modules.nixos; [
       base
       home-manager
-      desktop
-      jadeUsers
+      jade-core
+      jade-develop
     ] ++ [ "${inputs.self}/nixos/virtual_machine/hardware-configuration.nix" ];
 
     networking.hostName = "virtual_machine";
@@ -18,6 +18,8 @@
       root = "/dev/vda2";
       swap = "/dev/vda3";
     };
+
+    my.capabilities.window_manager = "hyprland";
 
     console.keyMap = "us";
 

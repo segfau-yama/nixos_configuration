@@ -1,0 +1,201 @@
+* {
+  font-family: "Inter", "Symbols Nerd Font", "Font Awesome 6 Free", "Noto Sans CJK JP", sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  min-height: 0;
+  min-width: 0;
+}
+
+#bar {
+  background: transparent;
+  border-radius: 14px;
+}
+
+#bar,
+.background {
+  border-radius: 14px;
+}
+
+.background {
+  background: rgba(17, 17, 27, 0.7);
+  color: #edf6f4;
+  border-bottom: 1px solid rgba(203, 166, 247, 0.15);
+}
+
+tooltip,
+.popup {
+  background: rgba(17, 17, 27, 0.96);
+  color: #cdd6f4;
+  border: 1px solid rgba(203, 166, 247, 0.28);
+  border-radius: 12px;
+}
+
+tooltip label {
+  color: #cdd6f4;
+}
+
+button {
+  min-height: 0;
+  min-width: 0;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  background-image: none;
+  box-shadow: none;
+  text-shadow: none;
+  color: inherit;
+}
+
+button:hover,
+button:focus,
+button:checked,
+button:active {
+  border: none;
+  background-image: none;
+  box-shadow: none;
+  text-shadow: none;
+}
+
+#bar #start,
+#bar #center,
+#bar #end {
+  margin: 0 6px;
+}
+
+.widget-container {
+  min-height: 0;
+}
+
+.widget,
+.label,
+.volume,
+.clock,
+.tray {
+  margin: 3px 1px;
+  padding: 0 9px;
+  border-radius: 9px;
+  border: none;
+  background: transparent;
+  background-image: none;
+  box-shadow: none;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.widget:hover,
+.label:hover,
+.volume:hover,
+.tray .item:hover {
+  background: rgba(203, 166, 247, 0.12);
+}
+
+.workspaces {
+  margin: 0;
+  padding: 0 2px;
+  background: transparent;
+  border: none;
+}
+
+.workspaces .item {
+  padding: 0 8px;
+  margin: 4px 2px;
+  min-height: 24px;
+  min-width: 22px;
+  border-radius: 9px;
+  border: none;
+  background: transparent;
+  background-image: none;
+  box-shadow: none;
+  color: #6c7086;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.workspaces .item:hover {
+  background: rgba(203, 166, 247, 0.14);
+  color: #cdd6f4;
+}
+
+.workspaces .item.focused,
+.workspaces .item.visible {
+  background: rgba(203, 166, 247, 0.28);
+  color: #cba6f7;
+}
+
+.workspaces .item.urgent {
+  background: rgba(243, 139, 168, 0.24);
+  color: #f38ba8;
+}
+
+.workspaces .item.inactive {
+  color: #45475a;
+}
+
+.focused {
+  color: #bac2de;
+  padding: 0 9px;
+}
+
+.focused .label {
+  margin: 0;
+  padding: 0;
+  background: transparent;
+}
+
+#launcher {
+  color: #cba6f7;
+  font-size: 17px;
+  padding: 0 11px;
+}
+
+.volume,
+#network,
+.tray,
+#power {
+  color: #cba6f7;
+  font-size: 16px;
+}
+
+.volume.muted {
+  color: #585b70;
+}
+
+.tray {
+  padding: 0 7px;
+}
+
+.tray .item {
+  padding: 0 3px;
+  margin: 0 1px;
+  border-radius: 8px;
+  background: transparent;
+  background-image: none;
+}
+
+.tray .item label {
+  font-size: 0;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+}
+
+.tray .item image {
+  min-width: 16px;
+  min-height: 16px;
+}
+
+.tray .item.urgent {
+  background: rgba(243, 139, 168, 0.22);
+}
+
+.clock {
+  color: #cdd6f4;
+  background: rgba(49, 50, 68, 0.65);
+  border-radius: 9px;
+  padding: 0 14px;
+  margin: 3px 4px 3px 7px;
+}
+
+.clock:hover {
+  background: rgba(69, 71, 90, 0.8);
+}

@@ -125,14 +125,14 @@ nixos-generate-config \
 
 | プリセット名 | タイプ | DE | インストールパッケージ |
 |-------------|--------|----|-----------------------|
-| jade-core | TUI（CUI + TUI + マウス対応） | なし | programming, cli-tools, browser, media, sns |
+| jade-core | TUI（CUI + TUI + マウス対応） | なし | programming, browser, media, sns |
 | jade-office | GUI | KDE Plasma | browser, media, sns, office |
 | jade-gaming | GUI | KDE Plasma | browser, gaming, media, sns |
-| jade-develop | GUI | Hyprland | programming, cli-tools, browser, media, sns, kicad, freecad |
-| jade-full | GUI | Hyprland | programming, lang, nix-tools, cli-tools, browser, gaming, media, sns, kicad, freecad, zed |
+| jade-develop | GUI | Hyprland | programming, browser, media, sns, electronics, mechanical |
+| jade-full | GUI | Hyprland | programming, browser, gaming, media, sns, electronics, mechanical |
 | custom | 任意 | 任意 | 任意 |
 
-> **jade-develop と jade-full の差分**: jade-full は lang/nix-tools/gaming/zed を追加で含む完全セット
+> **jade-develop と jade-full の差分**: jade-full は gaming を追加で含む完全セット
 
 - ユーザーは名前を変更して追加できる
 - プリセットを選択するとパスワード入力のみ追加の手順が必要

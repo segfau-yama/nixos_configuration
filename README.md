@@ -53,31 +53,33 @@ nixos_configuration/
     │       └── home-manager.nix # Home Manager NixOS 統合
     │
     ├── software/
-    │   ├── base.nix             # 共通基盤（Nix設定・locale・fcitx5・audio）
+    │   ├── base.nix             # 共通基盤（Nix設定・locale・fcitx5・audio・ファイル/音量ツール）
     │   │
-    │   ├── gui/
-    │   │   ├── desktop/         # Hyprland・greetd・XDG Portal・Ironbar (NixOS + HM)
-    │   │   ├── browser/         # Chromium
-    │   │   ├── gaming/          # Lutris・Wine・Winetricks
-    │   │   ├── media/           # Spotify・mpv・playerctl
-    │   │   ├── sns/             # Discord
-    │   │   ├── kicad/           # KiCad
-    │   │   ├── freecad/         # FreeCAD + MeshLab
-    │   │   └── zed/             # Zed エディター（unstable）
+    │   ├── desktop/             # Hyprland・Plasma・greetd・XDG Portal
     │   │
-    │   └── cui/
-    │       ├── programming/     # nix-ld (NixOS) + Zsh/Nushell/Direnv (HM)
-    │       ├── lang/            # Rust・Clang・Python
-    │       ├── nix-tools/       # nix-index・devenv・nil・nixfmt
-    │       └── cli-tools/       # git・xh・jaq・just・pkg-config
+    │   ├── programming/         # CLI・言語ツール・Nushell・Direnv（GUI時のみZed）
+    │   ├── browser/             # Chromium / w3m
+    │   ├── media/               # GUI/TUI メディアツール
+    │   ├── sns/                 # Discord / Weechat
+    │   ├── office/              # LibreOffice
+    │   ├── gaming/              # Lutris・Wine・Winetricks
+    │   ├── electronics/         # KiCad
+    │   ├── mechanical/          # FreeCAD + MeshLab
+    │
     │
     ├── users/
-    │   ├── jade/
-    │   │   └── jade.nix         # jade-cui/gui/gaming/develop デフォルトユーザー
+    │   ├── jade-core/
+    │   │   └── jade-core.nix    # TUI/CUI プリセットユーザー
+    │   ├── jade-office/
+    │   │   └── jade-office.nix  # KDE Plasma + office プリセットユーザー
+    │   ├── jade-gaming/
+    │   │   └── jade-gaming.nix  # KDE Plasma + gaming プリセットユーザー
+    │   ├── jade-develop/
+    │   │   └── jade-develop.nix # Hyprland + development プリセットユーザー
+    │   ├── jade-full/
+    │   │   └── jade-full.nix    # Hyprland + full package プリセットユーザー
     │   ├── suichan/
     │   │   └── suichan.nix      # 旧メインユーザー
-    │   └── admin/
-    │       └── admin.nix        # 旧管理者ユーザー
     │
     ├── devshell.nix             # nix develop 用シェル（nixd・alejandra）
     └── flake-parts.nix          # flake-parts modules エクストラのインポート
@@ -94,36 +96,36 @@ nixos_configuration/
 | `base` | ブート・NM・Nix GC・stateVersion・unstable overlay・locale・fcitx5・audio |
 | `hardware` | GPU/CPU ドライバー・マイクロコード・nix-auto-storage（`my.hardware.*` オプション） |
 | `home-manager` | Home Manager NixOS 統合 |
-| `desktop` | Hyprland・Plasma・greetd・polkit・seatd・XDG Portal・Ironbar |
-| `programming` | nix-ld（パッチなし ELF バイナリ実行） |
-| `jadeUsers` | jade-cui/gui/gaming/develop デフォルトユーザー定義 + HM 統合 |
-| `jade-cui` | CUI ユーザー定義 |
-| `jade-gui` | Hyprland GUI ユーザー定義 |
+| `desktop` | Hyprland・Plasma・greetd・polkit・seatd・XDG Portal |
+| `desktopHyprland` | Hyprland セッション基盤 |
+| `desktopPlasma` | KDE Plasma セッション基盤 |
+| `jade-core` | TUI/CUI ユーザー定義 |
+| `jade-office` | KDE Plasma オフィス用ユーザー定義 |
 | `jade-gaming` | Plasma ゲーム用ユーザー定義 |
 | `jade-develop` | Hyprland 開発用ユーザー定義 |
+| `jade-full` | Hyprland フルセットユーザー定義 |
 | `suichan` | 旧 suichan ユーザー定義 + HM 統合 |
-| `admin` | 旧 admin ユーザー定義 |
 
 ### Home Manager モジュール（`modules.homeManager.*`）
 
 | モジュール名 | 役割 |
 |---|---|
-| `desktop` | Hyprland config・Hyprpaper・Ironbar・mako |
-| `programming` | Zsh・Nushell・Direnv |
-| `lang` | Rust・Clang・mold・Python |
-| `nix-tools` | nix-index・devenv・nil・nixfmt-rfc-style |
-| `cli-tools` | git・xh・jaq・just・pkg-config |
+| `desktopHyprland` | Hyprland config・Hyprpaper・Ironbar・mako |
+| `desktopPlasma` | Plasma ユーザー用 DE フック |
+| `base` | zsh・capabilities・nix-index・devenv・nil・nixfmt-rfc-style・ファイル/音量ツール |
+| `programming` | Git・CLI ツール・Rust/Clang/Python・Nushell・Direnv・GUI時のみZed |
 | `browser` | Chromium |
 | `gaming` | Lutris・Wine・Winetricks |
 | `media` | Spotify・mpv・oculante・playerctl |
 | `sns` | Discord |
-| `kicad` | KiCad |
-| `freecad` | FreeCAD (Wayland)・MeshLab |
-| `zed` | Zed エディター（unstable チャンネル） |
-| `jade-cui` | jade-cui の HM 設定（base） |
-| `jade-gui` | jade-gui の HM 設定（base + desktop） |
-| `jade-gaming` | jade-gaming の HM 設定（base + gaming） |
-| `jade-develop` | jade-develop の HM 設定（base + desktop + 開発ツール） |
+| `office` | LibreOffice・Hunspell |
+| `electronics` | KiCad |
+| `mechanical` | FreeCAD (Wayland)・MeshLab |
+| `jade-core` | jade-core の HM 設定（base + TUI/CUI ツール） |
+| `jade-office` | jade-office の HM 設定（base + desktopPlasma + office） |
+| `jade-gaming` | jade-gaming の HM 設定（base + desktopPlasma + gaming） |
+| `jade-develop` | jade-develop の HM 設定（base + desktopHyprland + 開発/CAD ツール） |
+| `jade-full` | jade-full の HM 設定（base + desktopHyprland + 全用途ツール） |
 | `suichan` | 旧 suichan ユーザーの HM 設定 |
 
 ---
@@ -435,10 +437,11 @@ git diff
 ユーザーパスワードを設定します（TTY から root でログイン）。
 
 ```bash
-passwd jade-cui
-passwd jade-gui
+passwd jade-core
+passwd jade-office
 passwd jade-gaming
 passwd jade-develop
+passwd jade-full
 ```
 
 あわせて以下を確認:
@@ -460,11 +463,11 @@ passwd jade-develop
 | nix-auto-storage 設定 | `modules/hardware/hardware.nix` |
 | ホスト固有設定（GPU 種別等） | `modules/hosts/<hostname>/configuration.nix` |
 | 共通基盤（Nix・GC・ブート・locale・入力・音声） | `modules/software/base.nix` |
-| Hyprland・greetd・Ironbar | `modules/software/gui/desktop/` |
-| ゲーミング (Lutris/Wine) | `modules/software/gui/gaming/gaming.nix` |
-| 開発ツール（シェル・Direnv） | `modules/software/cui/programming/programming.nix` |
-| 言語ツールチェーン | `modules/software/cui/lang/lang.nix` |
-| ユーザー設定（jade-*） | `modules/users/jade/jade.nix` |
+| Hyprland・greetd・Ironbar | `modules/software/desktop/` |
+| ゲーミング (Lutris/Wine) | `modules/software/gaming/gaming.nix` |
+| 開発ツール（シェル・Direnv） | `modules/software/programming/programming.nix` |
+| 言語ツールチェーン | `modules/software/programming/programming.nix` |
+| ユーザー設定（jade-*） | `modules/users/<preset>/<preset>.nix` |
 
 ### 2. 変更を Git に追加
 
@@ -556,8 +559,8 @@ flake.nix
 
 ```bash
 # 例: 新しいツールを追加
-mkdir -p modules/software/gui/newapp
-cat > modules/software/gui/newapp/newapp.nix <<'EOF'
+mkdir -p modules/software/newapp
+cat > modules/software/newapp/newapp.nix <<'EOF'
 { ... }:
 {
   flake.modules.homeManager.newapp = { pkgs, ... }: {
@@ -566,7 +569,7 @@ cat > modules/software/gui/newapp/newapp.nix <<'EOF'
 }
 EOF
 
-git add modules/software/gui/newapp/newapp.nix
+git add modules/software/newapp/newapp.nix
 ```
 
 あとはユーザーの HM 設定（`modules/users/<user>/<user>.nix`）の `imports` に `newapp` を追加するだけです。

@@ -117,7 +117,7 @@
 
   <g transform="rotate(-0.15 510 970)">
     <rect class="node" x="285" y="925" width="720" height="78" rx="20" fill="#ffd4a8"/>
-    <text class="mid" x="318" y="972">gui/</text>
+    <text class="mid" x="318" y="972">software/</text>
     <rect x="420" y="945" width="120" height="36" rx="14" fill="#fff8e6" stroke="#222" stroke-width="3"/>
     <text class="small" x="442" y="969">desktop</text>
     <rect x="555" y="945" width="120" height="36" rx="14" fill="#fff8e6" stroke="#222" stroke-width="3"/>
@@ -127,30 +127,30 @@
     <rect x="817" y="945" width="72" height="36" rx="14" fill="#fff8e6" stroke="#222" stroke-width="3"/>
     <text class="small" x="838" y="969">CAD</text>
     <rect x="904" y="945" width="78" height="36" rx="14" fill="#fff8e6" stroke="#222" stroke-width="3"/>
-    <text class="small" x="928" y="969">zed</text>
+    <text class="small" x="916" y="969">office</text>
   </g>
 
   <g transform="rotate(0.15 510 1060)">
     <rect class="node" x="285" y="1015" width="720" height="78" rx="20" fill="#bfe8ff"/>
-    <text class="mid" x="318" y="1062">cui/</text>
+    <text class="mid" x="318" y="1062">dev/</text>
     <rect x="420" y="1035" width="128" height="36" rx="14" fill="#eef9ff" stroke="#222" stroke-width="3"/>
-    <text class="small" x="440" y="1059">cli-tools</text>
+    <text class="small" x="426" y="1059">programming</text>
     <rect x="565" y="1035" width="86" height="36" rx="14" fill="#eef9ff" stroke="#222" stroke-width="3"/>
-    <text class="small" x="588" y="1059">lang</text>
+    <text class="small" x="590" y="1059">base</text>
     <rect x="668" y="1035" width="128" height="36" rx="14" fill="#eef9ff" stroke="#222" stroke-width="3"/>
-    <text class="small" x="686" y="1059">nix-tools</text>
+    <text class="small" x="686" y="1059">nix tools</text>
     <rect x="813" y="1035" width="164" height="36" rx="14" fill="#eef9ff" stroke="#222" stroke-width="3"/>
-    <text class="small" x="832" y="1059">programming</text>
+    <text class="small" x="846" y="1059">cli/lang/zed</text>
   </g>
 
   <g transform="rotate(0.25 1430 970)">
     <rect class="node" x="1280" y="850" width="405" height="245" rx="24" fill="#dcffd6"/>
     <text class="mid" x="1430" y="895">recipes</text>
     <text class="small" x="1320" y="935">desktop user</text>
-    <text class="small" x="1345" y="963" textLength="285" lengthAdjust="spacingAndGlyphs">base + gui/desktop + cui/cli-tools</text>
+    <text class="small" x="1345" y="963" textLength="285" lengthAdjust="spacingAndGlyphs">base + desktop + programming</text>
     <text class="small" x="1320" y="1000">GUI workstation</text>
     <text class="small" x="1345" y="1028">base + gui/*</text>
-    <text class="small" x="1320" y="1065">CUI/admin: base + cui/*</text>
+    <text class="small" x="1320" y="1065">jade-core: base + tui/cui</text>
   </g>
 
   <path class="flow" d="M 1100 970 C 1165 970, 1215 970, 1276 970"/>

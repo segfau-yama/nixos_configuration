@@ -443,17 +443,30 @@ fn preset_or_custom(app: &App, value: String) -> String {
 
 fn user_menu_fields(app: &App) -> Vec<FormField> {
     let mut fields = vec![
+        user_menu_choice_field(app, UserMenuChoice::JadeCore, "jade-core", "TUI core user"),
         user_menu_choice_field(
             app,
-            UserMenuChoice::Jade,
-            "jade",
-            "standard user (GUI desktop)",
+            UserMenuChoice::JadeOffice,
+            "jade-office",
+            "KDE Plasma office user",
         ),
         user_menu_choice_field(
             app,
-            UserMenuChoice::Admin,
-            "admin",
-            "administrator (minimal CUI)",
+            UserMenuChoice::JadeGaming,
+            "jade-gaming",
+            "KDE Plasma gaming user",
+        ),
+        user_menu_choice_field(
+            app,
+            UserMenuChoice::JadeDevelop,
+            "jade-develop",
+            "Hyprland development user",
+        ),
+        user_menu_choice_field(
+            app,
+            UserMenuChoice::JadeFull,
+            "jade-full",
+            "Hyprland full package user",
         ),
         form_field(
             "custom",
@@ -502,8 +515,11 @@ fn user_menu_choice_field(
         "default config".to_string()
     };
     let hint = match choice {
-        UserMenuChoice::Jade => "preset GUI user; password required",
-        UserMenuChoice::Admin => "preset CUI user; password required",
+        UserMenuChoice::JadeCore => "preset TUI user; password required",
+        UserMenuChoice::JadeOffice
+        | UserMenuChoice::JadeGaming
+        | UserMenuChoice::JadeDevelop
+        | UserMenuChoice::JadeFull => "preset GUI user; password required",
         _ => description,
     };
     form_field(
@@ -555,7 +571,13 @@ fn custom_type_fields(app: &App) -> Vec<FormField> {
         form_field(
             "GUI",
             selected_value(user_type == UserType::Gui),
-            Some("With desktop environment (Niri / Wayland)".to_string()),
+            Some("With desktop environment (KDE Plasma / Hyprland)".to_string()),
+            FormFieldRole::Choice,
+        ),
+        form_field(
+            "TUI",
+            selected_value(user_type == UserType::Tui),
+            Some("Terminal tools with mouse-aware apps".to_string()),
             FormFieldRole::Choice,
         ),
         form_field(
@@ -581,20 +603,11 @@ fn custom_program_fields(app: &App) -> Vec<FormField> {
         .into_iter()
         .map(|(name, description)| {
             let selected = user.programs.iter().any(|program| program == name);
-            let required = name == "desktop" && user.user_type == UserType::Gui;
             form_field(
                 name,
                 if selected { "[x]" } else { "[ ]" }.to_string(),
-                Some(if required {
-                    format!("{description}; required")
-                } else {
-                    description.to_string()
-                }),
-                if required {
-                    FormFieldRole::ReadOnly
-                } else {
-                    FormFieldRole::Toggle
-                },
+                Some(description.to_string()),
+                FormFieldRole::Toggle,
             )
         })
         .collect()

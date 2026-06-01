@@ -7,8 +7,11 @@ use crate::{
 
 pub(crate) fn confirm_user_menu(app: &mut App) {
     match UserMenuChoice::from_index(app.active_field_for_current_screen()) {
-        UserMenuChoice::Jade => start_preset_user(app, "jade"),
-        UserMenuChoice::Admin => start_preset_user(app, "admin"),
+        UserMenuChoice::JadeCore => start_preset_user(app, "jade-core"),
+        UserMenuChoice::JadeOffice => start_preset_user(app, "jade-office"),
+        UserMenuChoice::JadeGaming => start_preset_user(app, "jade-gaming"),
+        UserMenuChoice::JadeDevelop => start_preset_user(app, "jade-develop"),
+        UserMenuChoice::JadeFull => start_preset_user(app, "jade-full"),
         UserMenuChoice::Custom => {
             app.pending_user = Some(PendingUser::custom());
             set_active_field(app, Screen::CustomUserBasic, 0);
@@ -102,10 +105,10 @@ pub(crate) fn confirm_user_password(app: &mut App) {
 pub(crate) fn sync_custom_user_type(app: &mut App) {
     let active = app.active_field_for_current_screen();
     if let Some(user) = app.pending_user.as_mut() {
-        user.user_type = if active == 0 {
-            UserType::Gui
-        } else {
-            UserType::Cui
+        user.user_type = match active {
+            0 => UserType::Gui,
+            1 => UserType::Tui,
+            _ => UserType::Cui,
         };
         user.programs = normalize_programs(user.user_type, user.programs.clone());
     }
@@ -119,9 +122,6 @@ pub(crate) fn toggle_program(app: &mut App, active: usize) {
     let Some(program) = options.get(active).map(|(name, _)| *name) else {
         return;
     };
-    if program == "desktop" {
-        return;
-    }
     if user.programs.iter().any(|candidate| candidate == program) {
         user.programs.retain(|candidate| candidate != program);
     } else {
@@ -144,17 +144,50 @@ fn start_preset_user(app: &mut App, username: &str) {
     }
 
     app.pending_user = match username {
-        "jade" => Some(PendingUser::preset(
-            "jade",
-            "Jade",
-            UserType::Gui,
-            &["desktop"],
+        "jade-core" => Some(PendingUser::preset(
+            "jade-core",
+            "Jade Core",
+            UserType::Tui,
+            &["programming", "browser", "media", "sns"],
         )),
-        "admin" => Some(PendingUser::preset(
-            "admin",
-            "Administrator",
-            UserType::Cui,
-            &[],
+        "jade-office" => Some(PendingUser::preset(
+            "jade-office",
+            "Jade Office",
+            UserType::Gui,
+            &["browser", "media", "sns", "office"],
+        )),
+        "jade-gaming" => Some(PendingUser::preset(
+            "jade-gaming",
+            "Jade Gaming",
+            UserType::Gui,
+            &["browser", "gaming", "media", "sns"],
+        )),
+        "jade-develop" => Some(PendingUser::preset(
+            "jade-develop",
+            "Jade Develop",
+            UserType::Gui,
+            &[
+                "programming",
+                "browser",
+                "media",
+                "sns",
+                "electronics",
+                "mechanical",
+            ],
+        )),
+        "jade-full" => Some(PendingUser::preset(
+            "jade-full",
+            "Jade Full",
+            UserType::Gui,
+            &[
+                "programming",
+                "browser",
+                "gaming",
+                "media",
+                "sns",
+                "electronics",
+                "mechanical",
+            ],
         )),
         _ => None,
     };
@@ -166,9 +199,7 @@ fn normalize_programs(user_type: UserType, programs: Vec<String>) -> Vec<String>
     let options = program_options_for(user_type);
     let mut normalized = Vec::new();
     for (program, _) in options {
-        if (program == "desktop" && user_type == UserType::Gui)
-            || programs.iter().any(|candidate| candidate == program)
-        {
+        if programs.iter().any(|candidate| candidate == program) {
             normalized.push(program.to_string());
         }
     }
@@ -176,7 +207,10 @@ fn normalize_programs(user_type: UserType, programs: Vec<String>) -> Vec<String>
 }
 
 fn is_reserved_username(username: &str) -> bool {
-    matches!(username, "greeter" | "jade" | "admin")
+    matches!(
+        username,
+        "jade-core" | "jade-office" | "jade-gaming" | "jade-develop" | "jade-full"
+    )
 }
 
 fn is_valid_username(username: &str) -> bool {
