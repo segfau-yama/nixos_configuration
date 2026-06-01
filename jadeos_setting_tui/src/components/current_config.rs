@@ -20,11 +20,15 @@ pub fn current_config_panel(app: &App) -> Paragraph<'static> {
 
 fn current_config_text(app: &App) -> Text<'static> {
     Text::from(vec![
+        summary_line("github", &github_display(app)),
+        summary_line("repo path", &app.config.repository_path),
+        Line::default(),
         summary_line("hostname", &app.config.hostname),
         summary_line("boot loader", app.config.boot_type.label()),
         summary_line("device", &app.config.device),
-        summary_line("boot end", &app.config.boot_end),
-        summary_line("root end", &app.config.root_end),
+        summary_line("boot size", &app.config.boot_size),
+        summary_line("swap size", &swap_display(app)),
+        summary_line("root", "remaining disk"),
         Line::default(),
         summary_line("keyboard", &app.config.keyboard),
         summary_line("locale", &app.config.locale),
@@ -43,6 +47,16 @@ fn current_config_text(app: &App) -> Text<'static> {
     ])
 }
 
+fn github_display(app: &App) -> String {
+    if !app.config.repository.trim().is_empty() {
+        app.config.repository.clone()
+    } else if !app.config.repository_url.trim().is_empty() {
+        app.config.repository_url.clone()
+    } else {
+        "not selected".to_string()
+    }
+}
+
 fn users_display(app: &App) -> String {
     if app.config.users.is_empty() {
         "none".to_string()
@@ -53,6 +67,14 @@ fn users_display(app: &App) -> String {
             .map(|user| format!("{}({})", user.username, user.user_type.label()))
             .collect::<Vec<_>>()
             .join(", ")
+    }
+}
+
+fn swap_display(app: &App) -> String {
+    if app.config.has_swap_partition() {
+        app.config.swap_size.clone()
+    } else {
+        "disabled".to_string()
     }
 }
 

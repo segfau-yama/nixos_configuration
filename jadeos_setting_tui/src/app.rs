@@ -2,16 +2,22 @@ use crossterm::event::KeyEvent;
 use std::collections::HashMap;
 
 use crate::config::{InstallConfig, UserType};
+use crate::infra::github::prepare_github_repository;
 use crate::infra::install::run_phase3_install;
-use crate::logic::setup::{HardwareInfo, apply_detected_config, collect_hardware};
+use crate::infra::network::check_network_connectivity;
+use crate::logic::setup::{
+    DeviceOption, HardwareInfo, apply_detected_config, collect_block_devices, collect_hardware,
+};
 use crate::update;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Screen {
     Welcome,
+    GitHubLogin,
     HardwareDetect,
     DeviceSelect,
     PartitionConfig,
+    PartitionConfirm,
     HostnameInput,
     KeyboardSelect,
     LocaleSelect,
@@ -20,6 +26,7 @@ pub enum Screen {
     StorageToggle,
     GpuSelect,
     CpuSelect,
+    BootTypeSelect,
     UserMenu,
     PresetUserPassword,
     CustomUserBasic,
@@ -33,11 +40,13 @@ pub enum Screen {
 }
 
 impl Screen {
-    pub const ORDER: [Self; 22] = [
+    pub const ORDER: [Self; 25] = [
         Self::Welcome,
+        Self::GitHubLogin,
         Self::HardwareDetect,
         Self::DeviceSelect,
         Self::PartitionConfig,
+        Self::PartitionConfirm,
         Self::HostnameInput,
         Self::KeyboardSelect,
         Self::LocaleSelect,
@@ -46,6 +55,7 @@ impl Screen {
         Self::StorageToggle,
         Self::GpuSelect,
         Self::CpuSelect,
+        Self::BootTypeSelect,
         Self::UserMenu,
         Self::PresetUserPassword,
         Self::CustomUserBasic,
@@ -61,9 +71,11 @@ impl Screen {
     pub fn title(self) -> &'static str {
         match self {
             Self::Welcome => "Welcome",
+            Self::GitHubLogin => "GitHub Login",
             Self::HardwareDetect => "Hardware Detect",
             Self::DeviceSelect => "Device Select",
             Self::PartitionConfig => "Partition Config",
+            Self::PartitionConfirm => "Partition Confirm",
             Self::HostnameInput => "Hostname",
             Self::KeyboardSelect => "Keyboard",
             Self::LocaleSelect => "Locale",
@@ -72,6 +84,7 @@ impl Screen {
             Self::StorageToggle => "Storage",
             Self::GpuSelect => "GPU",
             Self::CpuSelect => "CPU",
+            Self::BootTypeSelect => "Boot Type",
             Self::UserMenu => "Users",
             Self::PresetUserPassword => "Preset Password",
             Self::CustomUserBasic => "Custom User",
@@ -88,9 +101,11 @@ impl Screen {
     pub fn phase(self) -> &'static str {
         match self {
             Self::Welcome
+            | Self::GitHubLogin
             | Self::HardwareDetect
             | Self::DeviceSelect
             | Self::PartitionConfig
+            | Self::PartitionConfirm
             | Self::HostnameInput
             | Self::KeyboardSelect
             | Self::LocaleSelect
@@ -98,7 +113,8 @@ impl Screen {
             | Self::SshToggle
             | Self::StorageToggle
             | Self::GpuSelect
-            | Self::CpuSelect => "PC Config",
+            | Self::CpuSelect
+            | Self::BootTypeSelect => "PC Config",
             Self::UserMenu
             | Self::PresetUserPassword
             | Self::CustomUserBasic
@@ -183,11 +199,13 @@ pub struct App {
     pub screen: Screen,
     pub config: InstallConfig,
     pub hardware: HardwareInfo,
+    pub device_options: Vec<DeviceOption>,
     pub install_log: Vec<String>,
     pub should_quit: bool,
     pub input_state: HashMap<Screen, ScreenInputState>,
     pub pending_user: Option<PendingUser>,
     pub user_message: Option<String>,
+    pub partition_confirmation: String,
     pub install_confirmation: String,
     pub input_mode: InputMode,
 }
@@ -214,17 +232,23 @@ impl Default for App {
 
         let mut config = InstallConfig::default();
         let hardware = collect_hardware();
+        let device_options = collect_block_devices();
         apply_detected_config(&mut config, &hardware);
+        if let Some(device) = device_options.first() {
+            config.device = device.path.clone();
+        }
 
         Self {
             screen: Screen::Welcome,
             config,
             hardware,
+            device_options,
             install_log: vec!["installer bootstrap ready".to_string()],
             should_quit: false,
             input_state,
             pending_user: None,
             user_message: None,
+            partition_confirmation: String::new(),
             install_confirmation: String::new(),
             input_mode: InputMode::Normal,
         }
@@ -283,6 +307,12 @@ impl App {
         self.input_mode = InputMode::Normal;
         self.user_message = None;
         match self.screen {
+            Screen::Welcome => self.confirm_welcome(),
+            Screen::GitHubLogin => self.confirm_github_login(),
+            Screen::DeviceSelect => self.confirm_device_select(),
+            Screen::PartitionConfig => self.confirm_partition_config(),
+            Screen::PartitionConfirm => self.confirm_partition_plan(),
+            Screen::HostnameInput => self.confirm_hostname(),
             Screen::UserMenu => self.confirm_user_menu(),
             Screen::PresetUserPassword | Screen::CustomUserPassword => self.confirm_user_password(),
             Screen::CustomUserBasic => self.confirm_custom_basic(),
@@ -300,6 +330,7 @@ impl App {
     pub(crate) fn previous_screen_for_current_flow(&mut self) {
         self.input_mode = InputMode::Normal;
         match self.screen {
+            Screen::PartitionConfirm => self.screen = Screen::PartitionConfig,
             Screen::PresetUserPassword
             | Screen::CustomUserBasic
             | Screen::UserAddResult
@@ -348,6 +379,87 @@ impl App {
         update::user_flow::sync_custom_user_type(self);
     }
 
+    fn confirm_welcome(&mut self) {
+        match check_network_connectivity() {
+            Ok(()) => {
+                self.user_message = Some("Network check passed.".to_string());
+                self.next_screen();
+            }
+            Err(error) => {
+                self.user_message = Some(error);
+            }
+        }
+    }
+
+    fn confirm_github_login(&mut self) {
+        let mut logs = Vec::new();
+        match prepare_github_repository(&mut self.config, &mut logs) {
+            Ok(()) => {
+                self.install_log.extend(logs);
+                self.user_message =
+                    Some(format!("Repository ready: {}", self.config.repository_path));
+                self.next_screen();
+            }
+            Err(error) => {
+                self.install_log.extend(logs);
+                self.user_message = Some(error);
+            }
+        }
+    }
+
+    fn confirm_device_select(&mut self) {
+        let Some(device) = self
+            .device_options
+            .get(self.active_field_for_current_screen())
+            .map(|option| option.path.clone())
+        else {
+            self.user_message = Some("No install target disks were detected by lsblk.".to_string());
+            return;
+        };
+        let device = device.trim();
+        if device.is_empty() {
+            self.user_message = Some("Target device cannot be empty.".to_string());
+            return;
+        }
+        if !device.starts_with("/dev/") {
+            self.user_message = Some("Target device must be under /dev/.".to_string());
+            return;
+        }
+        self.config.device = device.to_string();
+        self.next_screen();
+    }
+
+    fn confirm_partition_config(&mut self) {
+        let boot_size = self.config.boot_size.trim().to_string();
+        let swap_size = self.config.swap_size.trim().to_string();
+        if !looks_like_parted_size(&boot_size) {
+            self.user_message = Some("Boot size must be a parted size like 512MiB.".to_string());
+            return;
+        }
+        if self.config.has_swap_partition() && !looks_like_parted_size(&swap_size) {
+            self.user_message = Some("Swap size must be 0 or a parted size like 2GiB.".to_string());
+            return;
+        }
+        self.config.boot_size = boot_size;
+        self.config.swap_size = if self.config.has_swap_partition() {
+            swap_size
+        } else {
+            "0".to_string()
+        };
+        self.next_screen();
+    }
+
+    fn confirm_hostname(&mut self) {
+        let hostname = self.config.hostname.trim();
+        if !is_valid_hostname(hostname) {
+            self.user_message =
+                Some("Hostname must use lowercase letters, digits, and hyphen.".to_string());
+            return;
+        }
+        self.config.hostname = hostname.to_string();
+        self.next_screen();
+    }
+
     pub fn user_exists(&self, username: &str) -> bool {
         self.config
             .users
@@ -376,10 +488,70 @@ impl App {
         }
     }
 
+    fn confirm_partition_plan(&mut self) {
+        if self.partition_confirmation.trim() != "yes" {
+            self.user_message = Some("Type 'yes' in confirm field before continuing.".to_string());
+            return;
+        }
+        self.user_message = None;
+        self.next_screen();
+    }
+
     fn screen_index(screen: Screen) -> usize {
         Screen::ORDER
             .iter()
             .position(|candidate| *candidate == screen)
             .unwrap_or(0)
+    }
+}
+
+fn looks_like_parted_size(value: &str) -> bool {
+    let mut chars = value.chars().peekable();
+    let mut has_digit = false;
+    while matches!(chars.peek(), Some(candidate) if candidate.is_ascii_digit()) {
+        chars.next();
+        has_digit = true;
+    }
+    let mut has_unit = false;
+    for c in chars {
+        if !c.is_ascii_alphabetic() {
+            return false;
+        }
+        has_unit = true;
+    }
+    has_digit && has_unit
+}
+
+fn is_valid_hostname(value: &str) -> bool {
+    if value.is_empty() || value.starts_with('-') || value.ends_with('-') {
+        return false;
+    }
+    value
+        .chars()
+        .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{is_valid_hostname, looks_like_parted_size};
+
+    #[test]
+    fn parted_size_requires_digits_and_unit() {
+        assert!(looks_like_parted_size("512MiB"));
+        assert!(looks_like_parted_size("2GiB"));
+        assert!(!looks_like_parted_size(""));
+        assert!(!looks_like_parted_size("512"));
+        assert!(!looks_like_parted_size("512 MiB"));
+        assert!(!looks_like_parted_size("half"));
+    }
+
+    #[test]
+    fn hostname_allows_lowercase_digits_and_internal_hyphen() {
+        assert!(is_valid_hostname("jade-develop1"));
+        assert!(!is_valid_hostname(""));
+        assert!(!is_valid_hostname("-jade"));
+        assert!(!is_valid_hostname("jade-"));
+        assert!(!is_valid_hostname("Jade"));
+        assert!(!is_valid_hostname("jade_dev"));
     }
 }

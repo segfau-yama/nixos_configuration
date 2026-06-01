@@ -90,6 +90,7 @@ pub fn render(frame: &mut Frame, app: &App) {
 fn render_popup_overlay(frame: &mut Frame, app: &App, section: FormSection) {
     let (width, height) = match app.screen {
         Screen::Summary => (72, 36),
+        Screen::PartitionConfirm => (72, 36),
         Screen::PresetUserPassword | Screen::CustomUserPassword => (72, 54),
         _ => (66, 44),
     };

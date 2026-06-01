@@ -1,5 +1,8 @@
 use serde::{Deserialize, Serialize};
 
+pub const DEFAULT_REPOSITORY_PATH: &str = "/tmp/nixos_config";
+pub const DEFAULT_REPOSITORY_URL: &str = "https://github.com/segfau-yama/nixos_configuration.git";
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum GpuType {
     None,
@@ -80,9 +83,13 @@ pub struct UserConfig {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct InstallConfig {
+    pub github_username: String,
+    pub repository: String,
+    pub repository_url: String,
+    pub repository_path: String,
     pub device: String,
-    pub boot_end: String,
-    pub root_end: String,
+    pub boot_size: String,
+    pub swap_size: String,
     pub hostname: String,
     pub keyboard: String,
     pub locale: String,
@@ -100,9 +107,13 @@ pub struct InstallConfig {
 impl Default for InstallConfig {
     fn default() -> Self {
         Self {
+            github_username: String::new(),
+            repository: "https://github.com/segfau-yama/nixos_configuration".to_string(),
+            repository_url: DEFAULT_REPOSITORY_URL.to_string(),
+            repository_path: DEFAULT_REPOSITORY_PATH.to_string(),
             device: String::new(),
-            boot_end: "512MiB".to_string(),
-            root_end: "100GiB".to_string(),
+            boot_size: "512MiB".to_string(),
+            swap_size: "0".to_string(),
             hostname: "nixos".to_string(),
             keyboard: "jp106".to_string(),
             locale: "ja_JP.UTF-8".to_string(),
@@ -130,5 +141,12 @@ impl InstallConfig {
         self.users
             .iter()
             .any(|user| user.programs.iter().any(|program| program == "programming"))
+    }
+
+    pub fn has_swap_partition(&self) -> bool {
+        !matches!(
+            self.swap_size.trim(),
+            "" | "0" | "0B" | "0K" | "0M" | "0G" | "0MiB" | "0GiB" | "none" | "false" | "no"
+        )
     }
 }

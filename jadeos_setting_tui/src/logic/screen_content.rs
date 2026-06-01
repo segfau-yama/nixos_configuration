@@ -7,7 +7,7 @@ use crate::app::{App, Screen, UserMenuChoice};
 use crate::components::form::{FormField, FormFieldRole, FormSection};
 use crate::config::UserType;
 use crate::logic::setup::{
-    CPU_OPTIONS, GPU_OPTIONS, KEYBOARD_OPTIONS, LOCALE_OPTIONS, TIMEZONE_OPTIONS,
+    BOOT_TYPE_OPTIONS, CPU_OPTIONS, GPU_OPTIONS, KEYBOARD_OPTIONS, LOCALE_OPTIONS, TIMEZONE_OPTIONS,
 };
 use crate::logic::user_programs::program_options_for;
 
@@ -26,8 +26,10 @@ pub fn screen_form_section(app: &App) -> FormSection {
             vec![
                 form_field(
                     "status",
-                    "installer bootstrap ready".to_string(),
-                    Some("Press Enter to continue".to_string()),
+                    app.user_message
+                        .clone()
+                        .unwrap_or_else(|| "installer bootstrap ready".to_string()),
+                    Some("Press Enter to run network check".to_string()),
                     FormFieldRole::ReadOnly,
                 ),
                 form_field(
@@ -38,6 +40,40 @@ pub fn screen_form_section(app: &App) -> FormSection {
                 ),
             ],
             None,
+        ),
+        Screen::GitHubLogin => form_section(
+            "github",
+            vec![
+                form_field(
+                    "repository",
+                    app.config.repository.clone(),
+                    Some(
+                        "owner/name, repo name, URL, or empty for nixos_configuration".to_string(),
+                    ),
+                    FormFieldRole::Text,
+                ),
+                form_field(
+                    "clone path",
+                    app.config.repository_path.clone(),
+                    Some("Working clone used before copying to /mnt/etc/nixos".to_string()),
+                    FormFieldRole::Text,
+                ),
+                form_field(
+                    "github user",
+                    app.config.github_username.clone(),
+                    Some("Only required when repository is empty or repo name only".to_string()),
+                    FormFieldRole::ReadOnly,
+                ),
+                form_field(
+                    "status",
+                    app.user_message.clone().unwrap_or_else(|| {
+                        "Press Enter to clone; gh is optional for full URLs".to_string()
+                    }),
+                    None,
+                    FormFieldRole::ReadOnly,
+                ),
+            ],
+            Some(active),
         ),
         Screen::HardwareDetect => form_section(
             "hardware",
@@ -65,31 +101,54 @@ pub fn screen_form_section(app: &App) -> FormSection {
         ),
         Screen::DeviceSelect => form_section(
             "device",
-            vec![form_field(
-                "target device",
-                app.config.device.clone(),
-                Some("Example: /dev/nvme0n1".to_string()),
-                FormFieldRole::Text,
-            )],
-            Some(active),
+            device_fields(app),
+            if app.device_options.is_empty() {
+                None
+            } else {
+                Some(0)
+            },
         ),
         Screen::PartitionConfig => form_section(
             "partition",
             vec![
                 form_field(
-                    "boot end",
-                    app.config.boot_end.clone(),
-                    Some("Example: 512MiB".to_string()),
+                    "boot size",
+                    app.config.boot_size.clone(),
+                    Some("Default: 512MiB".to_string()),
                     FormFieldRole::Text,
                 ),
                 form_field(
-                    "root end",
-                    app.config.root_end.clone(),
-                    Some("Example: 100GiB".to_string()),
+                    "swap size",
+                    app.config.swap_size.clone(),
+                    Some("Use 0 to disable swap; root uses remaining disk".to_string()),
                     FormFieldRole::Text,
                 ),
             ],
             Some(active),
+        ),
+        Screen::PartitionConfirm => form_section(
+            "partition confirmation",
+            vec![
+                form_field(
+                    "target disk",
+                    app.config.device.clone(),
+                    Some("This disk will be repartitioned and formatted".to_string()),
+                    FormFieldRole::ReadOnly,
+                ),
+                form_field(
+                    "layout",
+                    partition_layout(app),
+                    Some("Root partition uses the remaining disk space".to_string()),
+                    FormFieldRole::ReadOnly,
+                ),
+                form_field(
+                    "confirmation",
+                    "pending in popup".to_string(),
+                    Some("Confirm destructive operation in popup".to_string()),
+                    FormFieldRole::ReadOnly,
+                ),
+            ],
+            None,
         ),
         Screen::HostnameInput => form_section(
             "hostname",
@@ -234,6 +293,16 @@ pub fn screen_form_section(app: &App) -> FormSection {
             ],
             Some(active),
         ),
+        Screen::BootTypeSelect => form_section(
+            "boot type",
+            vec![form_field(
+                "selection",
+                app.config.boot_type.label().to_string(),
+                Some(format!("Space: cycle | {}", BOOT_TYPE_OPTIONS.join(" / "))),
+                FormFieldRole::Choice,
+            )],
+            Some(active),
+        ),
         Screen::UserMenu => form_section("users", user_menu_fields(app), Some(active)),
         Screen::PresetUserPassword => form_section(
             "preset password",
@@ -259,7 +328,7 @@ pub fn screen_form_section(app: &App) -> FormSection {
         Screen::CustomUserBasic => {
             form_section("custom user", custom_basic_fields(app), Some(active))
         }
-        Screen::CustomUserType => form_section("user type", custom_type_fields(app), Some(active)),
+        Screen::CustomUserType => form_section("user type", custom_type_fields(app), Some(0)),
         Screen::CustomUserPrograms => {
             form_section("programs", custom_program_fields(app), Some(active))
         }
@@ -384,6 +453,18 @@ pub fn screen_popup_section(app: &App) -> Option<FormSection> {
             password_fields(app),
             Some(active),
         )),
+        Screen::PartitionConfirm => Some(form_section(
+            "destructive operation",
+            vec![form_field(
+                "confirm",
+                app.partition_confirmation.clone(),
+                Some(app.user_message.clone().unwrap_or_else(|| {
+                    "Type 'yes' to accept repartitioning/formatting".to_string()
+                })),
+                FormFieldRole::Text,
+            )],
+            Some(active),
+        )),
         Screen::Summary => Some(form_section(
             "install confirmation",
             vec![form_field(
@@ -439,6 +520,35 @@ fn preset_or_custom(app: &App, value: String) -> String {
     } else {
         value
     }
+}
+
+fn device_fields(app: &App) -> Vec<FormField> {
+    if app.device_options.is_empty() {
+        return vec![form_field(
+            "target device",
+            "not detected".to_string(),
+            Some("No TYPE=disk entries were returned by lsblk".to_string()),
+            FormFieldRole::ReadOnly,
+        )];
+    }
+
+    let active = app.active_field_for_current_screen();
+    let selected = app
+        .device_options
+        .get(active)
+        .or_else(|| app.device_options.first())
+        .expect("device options are not empty");
+
+    vec![form_field(
+        "target device",
+        selected.label(),
+        Some(format!(
+            "{} / {} - Tab/Up/Down/Space: change, Enter: confirm",
+            active + 1,
+            app.device_options.len()
+        )),
+        FormFieldRole::Choice,
+    )]
 }
 
 fn user_menu_fields(app: &App) -> Vec<FormField> {
@@ -566,27 +676,17 @@ fn custom_type_fields(app: &App) -> Vec<FormField> {
         .as_ref()
         .map(|user| user.user_type)
         .unwrap_or(UserType::Gui);
+    let active = app.active_field_for_current_screen();
 
-    vec![
-        form_field(
-            "GUI",
-            selected_value(user_type == UserType::Gui),
-            Some("With desktop environment (KDE Plasma / Hyprland)".to_string()),
-            FormFieldRole::Choice,
-        ),
-        form_field(
-            "TUI",
-            selected_value(user_type == UserType::Tui),
-            Some("Terminal tools with mouse-aware apps".to_string()),
-            FormFieldRole::Choice,
-        ),
-        form_field(
-            "CUI",
-            selected_value(user_type == UserType::Cui),
-            Some("Terminal only".to_string()),
-            FormFieldRole::Choice,
-        ),
-    ]
+    vec![form_field(
+        "user type",
+        user_type.label().to_string(),
+        Some(format!(
+            "{} / 3 - Tab/Up/Down/Space: change, Enter: confirm",
+            active + 1
+        )),
+        FormFieldRole::Choice,
+    )]
 }
 
 fn custom_program_fields(app: &App) -> Vec<FormField> {
@@ -643,14 +743,6 @@ fn password_fields(app: &App) -> Vec<FormField> {
     ]
 }
 
-fn selected_value(selected: bool) -> String {
-    if selected {
-        "selected".to_string()
-    } else {
-        "available".to_string()
-    }
-}
-
 fn mask(value: &str) -> String {
     if value.is_empty() {
         String::new()
@@ -669,6 +761,20 @@ fn users_display(app: &App) -> String {
             .map(|user| format!("{}({})", user.username, user.user_type.label()))
             .collect::<Vec<_>>()
             .join(", ")
+    }
+}
+
+fn partition_layout(app: &App) -> String {
+    if app.config.has_swap_partition() {
+        format!(
+            "boot={} / swap={} / root=remaining",
+            app.config.boot_size, app.config.swap_size
+        )
+    } else {
+        format!(
+            "boot={} / swap=disabled / root=remaining",
+            app.config.boot_size
+        )
     }
 }
 

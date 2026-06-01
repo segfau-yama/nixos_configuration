@@ -1,7 +1,10 @@
 use crate::{
     app::{App, Screen},
-    config::{CpuType, GpuType},
-    logic::setup::{CPU_OPTIONS, GPU_OPTIONS, KEYBOARD_OPTIONS, LOCALE_OPTIONS, TIMEZONE_OPTIONS},
+    config::{BootType, CpuType, GpuType},
+    logic::setup::{
+        BOOT_TYPE_OPTIONS, CPU_OPTIONS, GPU_OPTIONS, KEYBOARD_OPTIONS, LOCALE_OPTIONS,
+        TIMEZONE_OPTIONS,
+    },
     update::user_flow,
 };
 
@@ -22,8 +25,10 @@ pub(crate) fn move_active_field(app: &mut App, direction: isize) {
         state.active_field = next;
     }
 
-    if app.screen == Screen::CustomUserType {
-        user_flow::sync_custom_user_type(app);
+    match app.screen {
+        Screen::DeviceSelect => sync_device_selection(app),
+        Screen::CustomUserType => user_flow::sync_custom_user_type(app),
+        _ => {}
     }
 }
 
@@ -56,11 +61,13 @@ pub(crate) fn backspace_active_field(app: &mut App) {
 pub(crate) fn toggle_active_field(app: &mut App) {
     let active = app.active_field_for_current_screen();
     match (app.screen, active) {
+        (Screen::DeviceSelect, _) => move_active_field(app, 1),
         (Screen::KeyboardSelect, 0) => toggle_preset_or_custom(app, KEYBOARD_OPTIONS),
         (Screen::LocaleSelect, 0) => toggle_preset_or_custom(app, LOCALE_OPTIONS),
         (Screen::TimezoneSelect, 0) => toggle_preset_or_custom(app, TIMEZONE_OPTIONS),
         (Screen::GpuSelect, 0) => toggle_preset_or_custom(app, GPU_OPTIONS),
         (Screen::CpuSelect, 0) => toggle_preset_or_custom(app, CPU_OPTIONS),
+        (Screen::BootTypeSelect, 0) => toggle_boot_type(app),
         (Screen::SshToggle, 0) => app.config.ssh_enabled = !app.config.ssh_enabled,
         (Screen::StorageToggle, 0) => app.config.storage_enabled = !app.config.storage_enabled,
         (Screen::UserMenu, _) => move_active_field(app, 1),
@@ -75,8 +82,10 @@ pub(crate) fn toggle_active_field(app: &mut App) {
 
 pub(crate) fn editable_field_count(app: &App, screen: Screen) -> usize {
     match screen {
-        Screen::DeviceSelect => 1,
+        Screen::GitHubLogin => 2,
+        Screen::DeviceSelect => app.device_options.len(),
         Screen::PartitionConfig => 2,
+        Screen::PartitionConfirm => 1,
         Screen::HostnameInput => 1,
         Screen::KeyboardSelect => 2,
         Screen::LocaleSelect => 2,
@@ -85,10 +94,11 @@ pub(crate) fn editable_field_count(app: &App, screen: Screen) -> usize {
         Screen::StorageToggle => 1,
         Screen::GpuSelect => 2,
         Screen::CpuSelect => 2,
-        Screen::UserMenu => 4,
+        Screen::BootTypeSelect => 1,
+        Screen::UserMenu => 7,
         Screen::PresetUserPassword => 2,
         Screen::CustomUserBasic => 2,
-        Screen::CustomUserType => 2,
+        Screen::CustomUserType => 3,
         Screen::CustomUserPrograms => user_flow::program_option_count(app),
         Screen::CustomUserPassword => 2,
         Screen::Summary => 1,
@@ -99,9 +109,11 @@ pub(crate) fn editable_field_count(app: &App, screen: Screen) -> usize {
 pub(crate) fn active_field_accepts_text(app: &App) -> bool {
     matches!(
         (app.screen, app.active_field_for_current_screen()),
-        (Screen::DeviceSelect, 0)
+        (Screen::GitHubLogin, 0)
+            | (Screen::GitHubLogin, 1)
             | (Screen::PartitionConfig, 0)
             | (Screen::PartitionConfig, 1)
+            | (Screen::PartitionConfirm, 0)
             | (Screen::HostnameInput, 0)
             | (Screen::KeyboardSelect, 1)
             | (Screen::LocaleSelect, 1)
@@ -120,9 +132,11 @@ pub(crate) fn active_field_accepts_text(app: &App) -> bool {
 
 fn text_field_mut(app: &mut App, screen: Screen, active_field: usize) -> Option<&mut String> {
     match (screen, active_field) {
-        (Screen::DeviceSelect, 0) => Some(&mut app.config.device),
-        (Screen::PartitionConfig, 0) => Some(&mut app.config.boot_end),
-        (Screen::PartitionConfig, 1) => Some(&mut app.config.root_end),
+        (Screen::GitHubLogin, 0) => Some(&mut app.config.repository),
+        (Screen::GitHubLogin, 1) => Some(&mut app.config.repository_path),
+        (Screen::PartitionConfig, 0) => Some(&mut app.config.boot_size),
+        (Screen::PartitionConfig, 1) => Some(&mut app.config.swap_size),
+        (Screen::PartitionConfirm, 0) => Some(&mut app.partition_confirmation),
         (Screen::HostnameInput, 0) => Some(&mut app.config.hostname),
         (Screen::KeyboardSelect, 1) => Some(&mut app.config.keyboard),
         (Screen::LocaleSelect, 1) => Some(&mut app.config.locale),
@@ -195,6 +209,7 @@ fn current_text_value_for_screen(app: &App) -> &str {
         Screen::TimezoneSelect => &app.config.timezone,
         Screen::GpuSelect => app.config.gpu_type.label(),
         Screen::CpuSelect => app.config.cpu_type.label(),
+        Screen::BootTypeSelect => app.config.boot_type.label(),
         _ => "",
     }
 }
@@ -225,7 +240,56 @@ fn apply_preset_for_current_screen(app: &mut App, value: &str) {
                 _ => app.config.cpu_type,
             };
         }
+        Screen::BootTypeSelect => {
+            app.config.boot_type = match value {
+                "systemd-boot" => BootType::SystemdBoot,
+                "grub" => BootType::Grub,
+                _ => app.config.boot_type,
+            };
+        }
         _ => {}
     }
     set_custom_selected(app, false);
+}
+
+fn toggle_boot_type(app: &mut App) {
+    let current = current_text_value_for_screen(app);
+    let next = if let Some(index) = BOOT_TYPE_OPTIONS
+        .iter()
+        .position(|candidate| *candidate == current)
+    {
+        BOOT_TYPE_OPTIONS[(index + 1) % BOOT_TYPE_OPTIONS.len()]
+    } else {
+        BOOT_TYPE_OPTIONS.first().copied().unwrap_or("systemd-boot")
+    };
+    apply_preset_for_current_screen(app, next);
+}
+
+fn sync_device_selection(app: &mut App) {
+    if let Some(device) = app
+        .device_options
+        .get(app.active_field_for_current_screen())
+        .map(|device| device.path.clone())
+    {
+        app.config.device = device;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn user_menu_can_focus_all_menu_actions() {
+        let app = App::default();
+
+        assert_eq!(editable_field_count(&app, Screen::UserMenu), 7);
+    }
+
+    #[test]
+    fn custom_user_type_can_focus_gui_tui_and_cui() {
+        let app = App::default();
+
+        assert_eq!(editable_field_count(&app, Screen::CustomUserType), 3);
+    }
 }
