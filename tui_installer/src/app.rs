@@ -533,8 +533,9 @@ impl App {
         self.install_running = true;
         self.install_log.clear();
         self.install_log
-            .push("install: background installer started".to_string());
-        self.status_message = Some("Installation running. Review the install log modal.".to_string());
+            .push("install: background installer started; logs will appear after completion".to_string());
+        self.status_message =
+            Some("Installation running. Review the install log modal.".to_string());
 
         thread::spawn(move || {
             let mut logs = Vec::new();

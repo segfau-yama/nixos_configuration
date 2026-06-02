@@ -153,7 +153,7 @@ fn log_display(install_log: &[String], install_running: bool) -> String {
 
 fn done_hint(install_running: bool) -> &'static str {
     if install_running {
-        "Install is running; log updates when the worker reports progress"
+        "Install is running; completion logs will appear here"
     } else {
         "Left returns to Summary, q quits"
     }
