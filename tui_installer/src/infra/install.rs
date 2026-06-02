@@ -683,15 +683,14 @@ fn host_module_content(config: &InstallConfig, users: &[UserConfig]) -> String {
         .join("");
     let custom_user_lines = users
         .iter()
-        .filter(|user| preset_user_module(&user.username).is_none())
+        .filter(|user| preset_user_module(user).is_none())
         .map(custom_user_definition)
         .collect::<Vec<_>>()
         .join("");
     let custom_gui_users = users
         .iter()
         .filter(|user| {
-            preset_user_module(&user.username).is_none()
-                && user.user_type == crate::config::UserType::Gui
+            preset_user_module(user).is_none() && user.user_type == crate::config::UserType::Gui
         })
         .map(|user| nix_string(user.username.trim()))
         .collect::<Vec<_>>()
@@ -704,6 +703,7 @@ fn host_module_content(config: &InstallConfig, users: &[UserConfig]) -> String {
         hostname,
         nix_string(hostname),
         nix_string(config.timezone.trim()),
+        nix_string(config.locale.trim()),
         nix_string(config.locale.trim()),
         nix_string(config.locale.trim()),
         nix_string(config.locale.trim()),
@@ -731,13 +731,12 @@ fn host_module_content(config: &InstallConfig, users: &[UserConfig]) -> String {
 fn host_imports(users: &[UserConfig]) -> Vec<&'static str> {
     let mut imports = vec!["base", "home-manager"];
     if users.iter().any(|user| {
-        preset_user_module(&user.username).is_none()
-            && user.user_type == crate::config::UserType::Gui
+        preset_user_module(user).is_none() && user.user_type == crate::config::UserType::Gui
     }) {
         imports.push("hyprland");
     }
     for user in users {
-        if let Some(module) = preset_user_module(&user.username)
+        if let Some(module) = preset_user_module(user)
             && !imports.contains(&module)
         {
             imports.push(module);
@@ -746,8 +745,11 @@ fn host_imports(users: &[UserConfig]) -> Vec<&'static str> {
     imports
 }
 
-fn preset_user_module(username: &str) -> Option<&'static str> {
-    match username.trim() {
+fn preset_user_module(user: &UserConfig) -> Option<&'static str> {
+    if !user.is_preset {
+        return None;
+    }
+    match user.username.trim() {
         "jade-core" => Some("jade-core"),
         "jade-office" => Some("jade-office"),
         "jade-gaming" => Some("jade-gaming"),
@@ -1135,6 +1137,74 @@ mod tests {
             device: "/dev/vda".to_string(),
             ..InstallConfig::default()
         }
+    }
+
+    fn user_config(
+        username: &str,
+        user_type: crate::config::UserType,
+        is_preset: bool,
+    ) -> UserConfig {
+        UserConfig {
+            username: username.to_string(),
+            display_name: username.to_string(),
+            user_type,
+            programs: vec!["browser".to_string(), "programming".to_string()],
+            password_hash: "$y$j9T$testhash".to_string(),
+            is_preset,
+        }
+    }
+
+    #[test]
+    fn generated_host_flake_exposes_configured_hostname() {
+        let mut config = install_config();
+        config.hostname = "jadeos".to_string();
+
+        let content = host_flake_parts_content(&config);
+
+        assert!(content.contains("inputs.self.lib.mkNixos \"x86_64-linux\" \"jadeos\""));
+    }
+
+    #[test]
+    fn generated_host_module_registers_users_and_install_settings() {
+        let mut config = install_config();
+        config.hostname = "jadeos".to_string();
+        config.gpu_type = crate::config::GpuType::Nvidia;
+        config.storage_enabled = true;
+        config.ssh_enabled = true;
+        let users = vec![
+            user_config("jade-core", crate::config::UserType::Cui, true),
+            user_config("alice", crate::config::UserType::Gui, false),
+        ];
+
+        let content = host_module_content(&config, &users);
+
+        assert!(content.contains("flake.modules.nixos.\"jadeos\""));
+        assert!(content.contains("      jade-core"));
+        assert!(content.contains("users.users.\"jade-core\".hashedPassword"));
+        assert!(content.contains("users.users.\"alice\" = {"));
+        assert!(content.contains("my.desktop.hyprlandUsers = [ \"alice\" ];"));
+        assert!(content.contains("my.hardware.gpu = lib.mkDefault \"nvidia\";"));
+        assert!(content.contains("my.hardware.storage.enable = true;"));
+        assert!(content.contains("services.openssh.enable = true;"));
+        assert!(content.contains("boot.loader.systemd-boot.enable = true;"));
+        assert!(!content.contains("cli-tools"));
+    }
+
+    #[test]
+    fn nixos_install_uses_path_flake_reference() {
+        let mut config = install_config();
+        config.hostname = "jadeos".to_string();
+        let runner = RecordingRunner::default();
+        let mut logs = Vec::new();
+
+        run_nixos_install(&config, &mut logs, &runner).unwrap();
+
+        assert!(
+            runner
+                .calls()
+                .iter()
+                .any(|call| call == "nixos-install --flake path:/mnt/etc/nixos#jadeos")
+        );
     }
 
     #[test]
