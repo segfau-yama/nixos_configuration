@@ -49,7 +49,7 @@ impl InstallerPage for SummaryPage {
                     "confirmation",
                     self.confirmation.clone(),
                     Some(
-                        "Type yes, stop editing, then press Right to open Done and start install"
+                        "Type yes, stop editing, then press Right to open the install log"
                             .to_string(),
                     ),
                     FormFieldRole::Text,
@@ -92,7 +92,7 @@ impl Component for SummaryPage {
                         Action::Navigate(Screen::Done)
                     } else {
                         Action::SetStatus(Some(
-                            "Type 'yes' before moving to Done and starting install".to_string(),
+                            "Type 'yes' before opening the install log".to_string(),
                         ))
                     }
                 }

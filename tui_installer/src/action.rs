@@ -44,6 +44,7 @@ pub enum Action {
     SetStatus(Option<String>),
     CheckNetwork,
     PrepareRepository,
+    StartInstall,
     ConfigChanged(ConfigChange),
     PendingUserChanged(PendingUserChange),
     StartPresetUser(PendingUser),

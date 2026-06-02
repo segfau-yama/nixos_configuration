@@ -1,4 +1,8 @@
-use std::collections::HashMap;
+use std::{
+    collections::HashMap,
+    sync::mpsc::{self, Receiver, TryRecvError},
+    thread,
+};
 
 use color_eyre::eyre::Result;
 use ratatui::{
@@ -183,6 +187,8 @@ pub struct AppSnapshot {
     pub hardware: HardwareInfo,
     pub devices: Vec<DeviceOption>,
     pub install_log: Vec<String>,
+    pub install_running: bool,
+    pub install_finished: bool,
 }
 
 pub struct App {
@@ -198,6 +204,14 @@ pub struct App {
     pub pages: HashMap<Screen, Box<dyn InstallerPage>>,
     pub hardware: HardwareInfo,
     pub devices: Vec<DeviceOption>,
+    install_running: bool,
+    install_finished: bool,
+    install_receiver: Option<Receiver<InstallOutcome>>,
+}
+
+struct InstallOutcome {
+    logs: Vec<String>,
+    result: std::result::Result<(), String>,
 }
 
 impl App {
@@ -228,6 +242,9 @@ impl App {
             pages,
             hardware,
             devices,
+            install_running: false,
+            install_finished: false,
+            install_receiver: None,
         };
 
         app.header.init()?;
@@ -238,6 +255,7 @@ impl App {
     }
 
     pub fn handle_event(&mut self, event: Option<Event>) -> Action {
+        self.poll_install_worker();
         self.sync_components();
         self.pages
             .get_mut(&self.current_screen)
@@ -335,15 +353,20 @@ impl App {
             Action::Quit => self.should_quit = true,
             Action::Navigate(screen) => {
                 self.current_screen = screen;
-                self.status_message = None;
                 if screen == Screen::Done {
-                    self.install_log.clear();
-                    self.run_install();
+                    if !self.install_running && !self.install_finished {
+                        self.install_log.clear();
+                        self.status_message =
+                            Some("Opening install log. Installation will start now.".to_string());
+                    }
+                } else {
+                    self.status_message = None;
                 }
             }
             Action::SetStatus(message) => self.status_message = message,
             Action::CheckNetwork => self.check_network(),
             Action::PrepareRepository => self.prepare_repository(),
+            Action::StartInstall => self.start_install(),
             Action::ConfigChanged(change) => self.apply_config_change(change),
             Action::PendingUserChanged(change) => self.apply_pending_user_change(change),
             Action::StartPresetUser(user) => {
@@ -453,6 +476,8 @@ impl App {
             hardware: self.hardware.clone(),
             devices: self.devices.clone(),
             install_log: self.install_log.clone(),
+            install_running: self.install_running,
+            install_finished: self.install_finished,
         }
     }
 
@@ -492,16 +517,63 @@ impl App {
         }
     }
 
-    fn run_install(&mut self) {
-        match run_phase3_install(&self.config, &self.config.users, &mut self.install_log) {
-            Ok(()) => {
-                self.current_screen = Screen::Done;
-                self.status_message = Some("Installation complete. Review logs below.".to_string());
+    fn start_install(&mut self) {
+        if self.install_running {
+            return;
+        }
+        if self.install_finished {
+            self.status_message = Some("Installation already finished. Review logs below.".to_string());
+            return;
+        }
+
+        let config = self.config.clone();
+        let users = self.config.users.clone();
+        let (sender, receiver) = mpsc::channel();
+        self.install_receiver = Some(receiver);
+        self.install_running = true;
+        self.install_log.clear();
+        self.install_log
+            .push("install: background installer started".to_string());
+        self.status_message = Some("Installation running. Review the install log modal.".to_string());
+
+        thread::spawn(move || {
+            let mut logs = Vec::new();
+            let result = run_phase3_install(&config, &users, &mut logs);
+            let _ = sender.send(InstallOutcome { logs, result });
+        });
+    }
+
+    fn poll_install_worker(&mut self) {
+        let Some(receiver) = self.install_receiver.take() else {
+            return;
+        };
+
+        match receiver.try_recv() {
+            Ok(outcome) => {
+                self.install_running = false;
+                self.install_finished = true;
+                self.install_log = outcome.logs;
+                match outcome.result {
+                    Ok(()) => {
+                        self.status_message =
+                            Some("Installation complete. Review logs below.".to_string());
+                    }
+                    Err(error) => {
+                        self.install_log.push(format!("install failed: {error}"));
+                        self.status_message = Some(format!("Installation failed: {error}"));
+                    }
+                }
             }
-            Err(error) => {
-                self.install_log.push(format!("install failed: {error}"));
-                self.current_screen = Screen::Done;
-                self.status_message = Some(format!("Installation failed: {error}"));
+            Err(TryRecvError::Empty) => {
+                self.install_receiver = Some(receiver);
+            }
+            Err(TryRecvError::Disconnected) => {
+                self.install_running = false;
+                self.install_finished = true;
+                self.install_log
+                    .push("install failed: installer worker disconnected".to_string());
+                self.status_message =
+                    Some("Installation failed: installer worker disconnected".to_string());
             }
         }
     }

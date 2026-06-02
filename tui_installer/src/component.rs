@@ -12,6 +12,7 @@ pub trait Component {
     fn handle_events(&mut self, event: Option<Event>) -> Action {
         match event {
             Some(Event::Quit) => Action::Quit,
+            Some(Event::Tick) => Action::Noop,
             Some(Event::Key(key_event)) => self.handle_key_events(key_event),
             Some(Event::Mouse(mouse_event)) => self.handle_mouse_events(mouse_event),
             None => Action::Noop,

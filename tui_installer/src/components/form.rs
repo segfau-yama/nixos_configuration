@@ -313,7 +313,7 @@ fn field_height(field: &FormField) -> u16 {
     if field.role == FormFieldRole::Log {
         let line_count = field.value.lines().count().max(1) as u16;
         let hint_height = if field.hint.is_some() { 1 } else { 0 };
-        return line_count.saturating_add(2).clamp(6, 18) + hint_height;
+        return line_count.saturating_add(2).clamp(6, 28) + hint_height;
     }
 
     if field.hint.is_some() { 4 } else { 3 }
