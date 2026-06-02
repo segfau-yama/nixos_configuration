@@ -1,0 +1,1 @@
+pub type Frame<'a> = ratatui::Frame<'a>;
