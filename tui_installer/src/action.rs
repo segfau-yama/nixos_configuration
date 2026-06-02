@@ -49,5 +49,4 @@ pub enum Action {
     StartPresetUser(PendingUser),
     CommitPendingUser,
     ResetPendingUser,
-    StartInstall,
 }

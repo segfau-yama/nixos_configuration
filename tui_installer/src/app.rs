@@ -336,6 +336,10 @@ impl App {
             Action::Navigate(screen) => {
                 self.current_screen = screen;
                 self.status_message = None;
+                if screen == Screen::Done {
+                    self.install_log.clear();
+                    self.run_install();
+                }
             }
             Action::SetStatus(message) => self.status_message = message,
             Action::CheckNetwork => self.check_network(),
@@ -349,10 +353,6 @@ impl App {
             }
             Action::CommitPendingUser => self.commit_pending_user(),
             Action::ResetPendingUser => self.pending_user = None,
-            Action::StartInstall => {
-                self.install_log.clear();
-                self.run_install();
-            }
         }
     }
 

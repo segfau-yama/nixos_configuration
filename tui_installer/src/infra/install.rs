@@ -35,7 +35,7 @@ fn run_phase3_install_with_runner<R: CommandRunner>(
     logs.push("preflight: checking root privileges".to_string());
     ensure_running_as_root(runner)?;
     logs.push("preflight: checking target disk mounts".to_string());
-    ensure_target_disk_is_not_mounted(config, runner)?;
+    ensure_target_disk_is_not_mounted(config, logs, runner)?;
     logs.push("preflight: checks passed".to_string());
 
     logs.push(format!(
@@ -88,8 +88,67 @@ fn ensure_running_as_root<R: CommandRunner>(runner: &R) -> Result<(), String> {
 
 fn ensure_target_disk_is_not_mounted<R: CommandRunner>(
     config: &InstallConfig,
+    logs: &mut Vec<String>,
     runner: &R,
 ) -> Result<(), String> {
+    let mounted = target_mounts(config, runner)?;
+    if mounted.is_empty() {
+        return Ok(());
+    }
+
+    if mounted
+        .iter()
+        .any(|partition| !is_installer_mountpoint(&partition.mountpoint))
+    {
+        return Err(format!(
+            "preflight: target disk {} has mounted partitions: {}. Boot from installer media or unmount them first.",
+            config.device,
+            format_mounts(&mounted)
+        ));
+    }
+
+    logs.push(format!(
+        "preflight: unmounting stale installer mounts: {}",
+        format_mounts(&mounted)
+    ));
+    let output = runner
+        .run("umount", &["-R", MOUNT_ROOT])
+        .map_err(|error| format!("preflight: failed to unmount {MOUNT_ROOT}: {error}"))?;
+    if output.exit_code != 0 {
+        return Err(format!(
+            "preflight: failed to unmount stale installer mounts under {MOUNT_ROOT}: {}",
+            output.stderr.trim()
+        ));
+    }
+
+    let mounted = target_mounts(config, runner)?;
+    if !mounted.is_empty() {
+        return Err(format!(
+            "preflight: target disk {} still has mounted partitions after cleanup: {}",
+            config.device,
+            format_mounts(&mounted)
+        ));
+    }
+    logs.push("preflight: stale installer mounts removed".to_string());
+    Ok(())
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct MountedPartition {
+    name: String,
+    mountpoint: String,
+}
+
+impl MountedPartition {
+    fn display(&self) -> String {
+        format!("{}:{}", self.name, self.mountpoint)
+    }
+}
+
+fn target_mounts<R: CommandRunner>(
+    config: &InstallConfig,
+    runner: &R,
+) -> Result<Vec<MountedPartition>, String> {
     let output = runner
         .run("lsblk", &["-nr", "-o", "NAME,MOUNTPOINT", &config.device])
         .map_err(|error| format!("preflight: failed to inspect target disk mounts: {error}"))?;
@@ -100,19 +159,10 @@ fn ensure_target_disk_is_not_mounted<R: CommandRunner>(
         ));
     }
 
-    let mounted = mounted_partitions(&output.stdout);
-    if !mounted.is_empty() {
-        return Err(format!(
-            "preflight: target disk {} has mounted partitions: {}. Boot from installer media or unmount them first.",
-            config.device,
-            mounted.join(", ")
-        ));
-    }
-
-    Ok(())
+    Ok(parse_mounted_partitions(&output.stdout))
 }
 
-fn mounted_partitions(output: &str) -> Vec<String> {
+fn parse_mounted_partitions(output: &str) -> Vec<MountedPartition> {
     output
         .lines()
         .filter_map(|line| {
@@ -126,10 +176,25 @@ fn mounted_partitions(output: &str) -> Vec<String> {
             if mountpoint.is_empty() {
                 None
             } else {
-                Some(format!("{name}:{mountpoint}"))
+                Some(MountedPartition {
+                    name: name.to_string(),
+                    mountpoint: mountpoint.to_string(),
+                })
             }
         })
         .collect()
+}
+
+fn is_installer_mountpoint(mountpoint: &str) -> bool {
+    mountpoint == MOUNT_ROOT || mountpoint.starts_with("/mnt/")
+}
+
+fn format_mounts(mounted: &[MountedPartition]) -> String {
+    mounted
+        .iter()
+        .map(MountedPartition::display)
+        .collect::<Vec<_>>()
+        .join(", ")
 }
 
 fn create_partitions<R: CommandRunner>(
@@ -635,7 +700,7 @@ fn copy_source_tree(src: &Path, dst: &Path) -> std::io::Result<()> {
 
 #[cfg(test)]
 mod tests {
-    use std::{cell::RefCell, io};
+    use std::{cell::RefCell, collections::VecDeque, io};
 
     use super::*;
     use crate::infra::command_runner::CommandOutput;
@@ -669,6 +734,47 @@ mod tests {
         }
     }
 
+    #[derive(Default)]
+    struct ScriptedRunner {
+        calls: RefCell<Vec<(String, Vec<String>)>>,
+        outputs: RefCell<VecDeque<CommandOutput>>,
+    }
+
+    impl ScriptedRunner {
+        fn with_outputs(outputs: Vec<CommandOutput>) -> Self {
+            Self {
+                calls: RefCell::new(Vec::new()),
+                outputs: RefCell::new(VecDeque::from(outputs)),
+            }
+        }
+
+        fn calls(&self) -> Vec<String> {
+            self.calls
+                .borrow()
+                .iter()
+                .map(|(program, args)| format!("{program} {}", args.join(" ")))
+                .collect()
+        }
+    }
+
+    impl CommandRunner for ScriptedRunner {
+        fn run(&self, program: &str, args: &[&str]) -> io::Result<CommandOutput> {
+            self.calls.borrow_mut().push((
+                program.to_string(),
+                args.iter().map(|arg| arg.to_string()).collect(),
+            ));
+            Ok(self
+                .outputs
+                .borrow_mut()
+                .pop_front()
+                .unwrap_or(CommandOutput {
+                    stdout: String::new(),
+                    stderr: String::new(),
+                    exit_code: 0,
+                }))
+        }
+    }
+
     fn install_config() -> InstallConfig {
         InstallConfig {
             device: "/dev/vda".to_string(),
@@ -677,13 +783,64 @@ mod tests {
     }
 
     #[test]
-    fn mounted_partitions_returns_name_and_mountpoint_pairs() {
+    fn parse_mounted_partitions_returns_name_and_mountpoint_pairs() {
         let output = "\n nvme1n1p1 /\nnvme1n1p2 /boot\nnvme1n1 \n";
 
         assert_eq!(
-            mounted_partitions(output),
+            parse_mounted_partitions(output)
+                .iter()
+                .map(MountedPartition::display)
+                .collect::<Vec<_>>(),
             vec!["nvme1n1p1:/".to_string(), "nvme1n1p2:/boot".to_string()]
         );
+    }
+
+    #[test]
+    fn installer_mounts_under_mnt_are_cleaned_before_preflight_check() {
+        let config = install_config();
+        let runner = ScriptedRunner::with_outputs(vec![
+            CommandOutput {
+                stdout: "vda \nvda1 /mnt/boot\nvda2 /mnt\n".to_string(),
+                stderr: String::new(),
+                exit_code: 0,
+            },
+            CommandOutput {
+                stdout: String::new(),
+                stderr: String::new(),
+                exit_code: 0,
+            },
+            CommandOutput {
+                stdout: "vda \nvda1 \nvda2 \n".to_string(),
+                stderr: String::new(),
+                exit_code: 0,
+            },
+        ]);
+        let mut logs = Vec::new();
+
+        ensure_target_disk_is_not_mounted(&config, &mut logs, &runner).unwrap();
+
+        let calls = runner.calls();
+        assert!(calls.iter().any(|call| call == "umount -R /mnt"));
+        assert!(
+            logs.iter()
+                .any(|line| line == "preflight: stale installer mounts removed")
+        );
+    }
+
+    #[test]
+    fn target_mounts_outside_mnt_are_rejected() {
+        let config = install_config();
+        let runner = ScriptedRunner::with_outputs(vec![CommandOutput {
+            stdout: "vda \nvda1 /boot\nvda2 /\n".to_string(),
+            stderr: String::new(),
+            exit_code: 0,
+        }]);
+        let mut logs = Vec::new();
+
+        let error = ensure_target_disk_is_not_mounted(&config, &mut logs, &runner).unwrap_err();
+
+        assert!(error.contains("Boot from installer media"));
+        assert!(!runner.calls().iter().any(|call| call == "umount -R /mnt"));
     }
 
     #[test]

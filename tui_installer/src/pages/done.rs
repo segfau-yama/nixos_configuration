@@ -37,7 +37,7 @@ impl Component for DonePage {
     fn handle_key_events(&mut self, key: KeyEvent) -> Action {
         match key.code {
             KeyCode::Char('q') => Action::Quit,
-            KeyCode::Left | KeyCode::Right | KeyCode::Enter => Action::Navigate(Screen::Summary),
+            KeyCode::Left | KeyCode::Esc => Action::Navigate(Screen::Summary),
             _ => Action::Noop,
         }
     }
@@ -54,8 +54,8 @@ impl Component for DonePage {
             vec![
                 form_field(
                     "result",
-                    "install flow complete",
-                    Some("Enter returns to Summary, q quits".to_string()),
+                    result_display(self.status_message.as_deref(), self.install_log.is_empty()),
+                    Some("Left returns to Summary, q quits".to_string()),
                     FormFieldRole::ReadOnly,
                 ),
                 form_field("install log", log, None, FormFieldRole::Log),
@@ -65,5 +65,16 @@ impl Component for DonePage {
             false,
         );
         render_form_section(f, rect, &section);
+    }
+}
+
+fn result_display(status_message: Option<&str>, log_is_empty: bool) -> &'static str {
+    match status_message {
+        Some(message) if message.contains("failed") || message.contains("Failed") => {
+            "installation failed"
+        }
+        Some(_) => "installation complete",
+        None if log_is_empty => "installation pending",
+        None => "installation finished",
     }
 }

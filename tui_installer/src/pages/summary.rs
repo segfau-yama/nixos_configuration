@@ -48,7 +48,10 @@ impl InstallerPage for SummaryPage {
                 vec![form_field(
                     "confirmation",
                     self.confirmation.clone(),
-                    Some("Type yes before starting install".to_string()),
+                    Some(
+                        "Type yes, stop editing, then press Right to open Done and start install"
+                            .to_string(),
+                    ),
                     FormFieldRole::Text,
                 )],
                 Some(0),
@@ -86,10 +89,10 @@ impl Component for SummaryPage {
                 }
                 KeyCode::Right => {
                     if self.confirmation.trim() == "yes" {
-                        Action::StartInstall
+                        Action::Navigate(Screen::Done)
                     } else {
                         Action::SetStatus(Some(
-                            "Type 'yes' in confirm field before starting install".to_string(),
+                            "Type 'yes' before moving to Done and starting install".to_string(),
                         ))
                     }
                 }
