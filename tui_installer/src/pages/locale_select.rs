@@ -1,17 +1,15 @@
 use ratatui::{
     crossterm::event::{KeyCode, KeyEvent},
     layout::Rect,
-    style::{Color, Modifier, Style},
-    text::{Line, Span},
-    widgets::{Block, Borders, Paragraph, Wrap},
 };
 
 use crate::{
     action::{Action, ConfigChange},
     app::{AppSnapshot, Screen},
     component::Component,
+    components::form::{FormFieldRole, FormSection, render_form_section},
     config::{KEYBOARD_OPTIONS, LOCALE_OPTIONS, TIMEZONE_OPTIONS},
-    pages::InstallerPage,
+    pages::{InstallerPage, form_field, status_field},
     terminal::Frame,
 };
 
@@ -39,6 +37,12 @@ pub struct SshPage {
     status_message: Option<String>,
 }
 
+#[derive(Default)]
+pub struct StoragePage {
+    enabled: bool,
+    status_message: Option<String>,
+}
+
 pub fn keyboard_page() -> Box<dyn InstallerPage> {
     Box::new(KeyboardPage::default())
 }
@@ -53,6 +57,10 @@ pub fn timezone_page() -> Box<dyn InstallerPage> {
 
 pub fn ssh_page() -> Box<dyn InstallerPage> {
     Box::new(SshPage::default())
+}
+
+pub fn storage_page() -> Box<dyn InstallerPage> {
+    Box::new(StoragePage::default())
 }
 
 impl InstallerPage for KeyboardPage {
@@ -85,8 +93,8 @@ impl Component for KeyboardPage {
         render_select_page(
             f,
             rect,
-            " Keyboard ",
-            "Choose the keyboard layout.",
+            "keyboard",
+            "selection",
             KEYBOARD_OPTIONS,
             self.selected,
             self.status_message.as_deref(),
@@ -124,8 +132,8 @@ impl Component for LocalePage {
         render_select_page(
             f,
             rect,
-            " Locale ",
-            "Pick the system locale.",
+            "locale",
+            "selection",
             LOCALE_OPTIONS,
             self.selected,
             self.status_message.as_deref(),
@@ -163,8 +171,8 @@ impl Component for TimezonePage {
         render_select_page(
             f,
             rect,
-            " Timezone ",
-            "Pick the timezone used on the installed system.",
+            "timezone",
+            "selection",
             TIMEZONE_OPTIONS,
             self.selected,
             self.status_message.as_deref(),
@@ -188,7 +196,7 @@ impl Component for SshPage {
         match key.code {
             KeyCode::Char('q') => Action::Quit,
             KeyCode::Left => Action::Navigate(Screen::TimezoneSelect),
-            KeyCode::Right => Action::Navigate(Screen::UserMenu),
+            KeyCode::Right => Action::Navigate(Screen::StorageToggle),
             KeyCode::Enter | KeyCode::Char(' ') => {
                 self.enabled = !self.enabled;
                 Action::ConfigChanged(ConfigChange::SshEnabled(self.enabled))
@@ -198,40 +206,53 @@ impl Component for SshPage {
     }
 
     fn render(&mut self, f: &mut Frame, rect: Rect) {
-        let block = Block::default()
-            .borders(Borders::ALL)
-            .title(" SSH ")
-            .border_style(Style::default().fg(Color::Blue));
-        let inner = block.inner(rect);
-        f.render_widget(block, rect);
+        render_toggle_page(
+            f,
+            rect,
+            "ssh",
+            "enabled",
+            self.enabled,
+            "Space or Enter toggles OpenSSH access",
+            self.status_message.as_deref(),
+        );
+    }
+}
 
-        let lines = vec![
-            Line::from("Toggle OpenSSH access for the installed system."),
-            Line::default(),
-            Line::from(vec![
-                Span::styled("value", Style::default().add_modifier(Modifier::BOLD)),
-                Span::raw(": "),
-                Span::styled(
-                    self.enabled.to_string(),
-                    if self.enabled {
-                        Style::default().fg(Color::Green)
-                    } else {
-                        Style::default().fg(Color::Red)
-                    },
-                ),
-            ]),
-            Line::default(),
-            Line::from("Space or Enter toggles the value. Right continues to user setup."),
-            match self.status_message.as_ref() {
-                Some(message) => Line::from(vec![
-                    Span::styled("status: ", Style::default().fg(Color::Yellow)),
-                    Span::raw(message.clone()),
-                ]),
-                None => Line::default(),
-            },
-        ];
+impl InstallerPage for StoragePage {
+    fn screen(&self) -> Screen {
+        Screen::StorageToggle
+    }
 
-        f.render_widget(Paragraph::new(lines).wrap(Wrap { trim: false }), inner);
+    fn sync(&mut self, snapshot: &AppSnapshot) {
+        self.enabled = snapshot.config.storage_enabled;
+        self.status_message = snapshot.status_message.clone();
+    }
+}
+
+impl Component for StoragePage {
+    fn handle_key_events(&mut self, key: KeyEvent) -> Action {
+        match key.code {
+            KeyCode::Char('q') => Action::Quit,
+            KeyCode::Left => Action::Navigate(Screen::SshToggle),
+            KeyCode::Right => Action::Navigate(Screen::UserMenu),
+            KeyCode::Enter | KeyCode::Char(' ') => {
+                self.enabled = !self.enabled;
+                Action::ConfigChanged(ConfigChange::StorageEnabled(self.enabled))
+            }
+            _ => Action::Noop,
+        }
+    }
+
+    fn render(&mut self, f: &mut Frame, rect: Rect) {
+        render_toggle_page(
+            f,
+            rect,
+            "storage",
+            "enabled",
+            self.enabled,
+            "Space or Enter toggles the optional storage module",
+            self.status_message.as_deref(),
+        );
     }
 }
 
@@ -266,42 +287,50 @@ fn render_select_page(
     f: &mut Frame,
     rect: Rect,
     title: &str,
-    description: &str,
+    label: &str,
     options: &[&str],
     selected: usize,
     status_message: Option<&str>,
 ) {
-    let block = Block::default()
-        .borders(Borders::ALL)
-        .title(title)
-        .border_style(Style::default().fg(Color::Blue));
-    let inner = block.inner(rect);
-    f.render_widget(block, rect);
-
-    let mut lines = vec![Line::from(description), Line::default()];
-    for (index, option) in options.iter().enumerate() {
-        lines.push(Line::from(vec![
-            Span::styled(
-                if index == selected { "> " } else { "  " },
-                Style::default().fg(Color::Yellow),
+    let section = FormSection::new(
+        title,
+        vec![
+            form_field(
+                label,
+                options[selected],
+                Some(format!("Space/Up/Down: cycle | {}", options.join(" / "))),
+                FormFieldRole::Choice,
             ),
-            Span::styled(
-                option.to_string(),
-                if index == selected {
-                    Style::default().add_modifier(Modifier::BOLD)
-                } else {
-                    Style::default()
-                },
-            ),
-        ]));
-    }
-    if let Some(message) = status_message {
-        lines.push(Line::default());
-        lines.push(Line::from(vec![
-            Span::styled("status: ", Style::default().fg(Color::Yellow)),
-            Span::raw(message.to_string()),
-        ]));
-    }
+            status_field(status_message),
+        ],
+        Some(0),
+        false,
+    );
+    render_form_section(f, rect, &section);
+}
 
-    f.render_widget(Paragraph::new(lines).wrap(Wrap { trim: false }), inner);
+fn render_toggle_page(
+    f: &mut Frame,
+    rect: Rect,
+    title: &str,
+    label: &str,
+    value: bool,
+    hint: &str,
+    status_message: Option<&str>,
+) {
+    let section = FormSection::new(
+        title,
+        vec![
+            form_field(
+                label,
+                value.to_string(),
+                Some(hint.to_string()),
+                FormFieldRole::Toggle,
+            ),
+            status_field(status_message),
+        ],
+        Some(0),
+        false,
+    );
+    render_form_section(f, rect, &section);
 }

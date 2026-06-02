@@ -1,17 +1,15 @@
 use ratatui::{
     crossterm::event::{KeyCode, KeyEvent},
     layout::Rect,
-    style::{Color, Modifier, Style},
-    text::{Line, Span},
-    widgets::{Block, Borders, Paragraph, Wrap},
 };
 
 use crate::{
     action::{Action, ConfigChange},
     app::{AppSnapshot, Screen},
     component::Component,
+    components::form::{FormFieldRole, FormSection, render_form_section},
     config::DeviceOption,
-    pages::InstallerPage,
+    pages::{InstallerPage, form_field, status_field},
     terminal::Frame,
 };
 
@@ -51,7 +49,7 @@ impl Component for DeviceSelectPage {
         match key.code {
             KeyCode::Char('q') => Action::Quit,
             KeyCode::Up => self.move_selection(-1),
-            KeyCode::Down | KeyCode::Tab => self.move_selection(1),
+            KeyCode::Down | KeyCode::Tab | KeyCode::Char(' ') => self.move_selection(1),
             KeyCode::Left => Action::Navigate(Screen::GitHubLogin),
             KeyCode::Right | KeyCode::Enter => {
                 if let Some(device) = self.devices.get(self.selected) {
@@ -68,50 +66,41 @@ impl Component for DeviceSelectPage {
     }
 
     fn render(&mut self, f: &mut Frame, rect: Rect) {
-        let block = Block::default()
-            .borders(Borders::ALL)
-            .title(" Device Select ")
-            .border_style(Style::default().fg(Color::Blue));
-        let inner = block.inner(rect);
-        f.render_widget(block, rect);
-
-        let mut lines = vec![
-            Line::from("Select the disk that will receive the installation."),
-            Line::default(),
-        ];
-
+        let mut fields = Vec::new();
         if self.devices.is_empty() {
-            lines.push(Line::from("No device entries are available in this prototype."));
-        } else {
-            for (index, device) in self.devices.iter().enumerate() {
-                lines.push(Line::from(vec![
-                    Span::styled(
-                        if index == self.selected { "> " } else { "  " },
-                        Style::default().fg(Color::Yellow),
-                    ),
-                    Span::styled(
-                        device.label(),
-                        if index == self.selected {
-                            Style::default().add_modifier(Modifier::BOLD)
-                        } else {
-                            Style::default()
-                        },
-                    ),
-                ]));
-            }
+            fields.push(form_field(
+                "target device",
+                "no install target disks detected",
+                Some("lsblk did not return any TYPE=disk entries".to_string()),
+                FormFieldRole::ReadOnly,
+            ));
+        } else if let Some(device) = self.devices.get(self.selected) {
+            fields.push(form_field(
+                "target device",
+                device.label(),
+                Some(format!(
+                    "{} / {} - Tab/Up/Down/Space: change, Enter: confirm",
+                    self.selected + 1,
+                    self.devices.len()
+                )),
+                FormFieldRole::Choice,
+            ));
+        }
+        if self.status_message.is_some() {
+            fields.push(status_field(self.status_message.as_deref()));
         }
 
-        lines.push(Line::default());
-        lines.push(Line::from("Up/Down changes the selection. Right confirms it."));
-        if let Some(message) = self.status_message.as_ref() {
-            lines.push(Line::from(vec![
-                Span::styled("status: ", Style::default().fg(Color::Yellow)),
-                Span::raw(message.clone()),
-            ]));
-        }
-
-        let paragraph = Paragraph::new(lines).wrap(Wrap { trim: false });
-        f.render_widget(paragraph, inner);
+        let section = FormSection::new(
+            "device",
+            fields,
+            if self.devices.is_empty() {
+                None
+            } else {
+                Some(0)
+            },
+            false,
+        );
+        render_form_section(f, rect, &section);
     }
 }
 

@@ -34,7 +34,6 @@ impl Component for Header {
             .block(
                 Block::default()
                     .borders(Borders::ALL)
-                    .title(" installer ")
                     .border_style(Style::default().fg(Color::Blue)),
             )
             .style(Style::default().fg(Color::DarkGray))

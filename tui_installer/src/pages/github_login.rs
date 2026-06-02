@@ -1,16 +1,14 @@
 use ratatui::{
     crossterm::event::{KeyCode, KeyEvent},
     layout::Rect,
-    style::{Color, Modifier, Style},
-    text::{Line, Span},
-    widgets::{Block, Borders, Paragraph, Wrap},
 };
 
 use crate::{
     action::{Action, ConfigChange},
     app::{AppSnapshot, Screen},
     component::Component,
-    pages::InstallerPage,
+    components::form::{FormFieldRole, FormSection, render_form_section},
+    pages::{InstallerPage, form_field, status_field},
     terminal::Frame,
 };
 
@@ -75,54 +73,40 @@ impl Component for GitHubLoginPage {
                     Action::Noop
                 }
                 KeyCode::Left => Action::Navigate(Screen::Welcome),
-                KeyCode::Right => {
-                    if self.github_username.trim().is_empty() {
-                        Action::SetStatus(Some("GitHub username is required".to_string()))
-                    } else {
-                        Action::Navigate(Screen::DeviceSelect)
-                    }
-                }
+                KeyCode::Right => Action::PrepareRepository,
                 _ => Action::Noop,
             }
         }
     }
 
     fn render(&mut self, f: &mut Frame, rect: Rect) {
-        let block = Block::default()
-            .borders(Borders::ALL)
-            .title(" GitHub Login ")
-            .border_style(Style::default().fg(Color::Blue));
-        let inner = block.inner(rect);
-        f.render_widget(block, rect);
-
-        let lines = vec![
-            Line::from("Configure the repository source before installation."),
-            Line::default(),
-            field_line(
-                self.active_field == 0,
-                self.editing && self.active_field == 0,
-                "GitHub user",
-                &self.github_username,
-            ),
-            field_line(
-                self.active_field == 1,
-                self.editing && self.active_field == 1,
-                "Repository",
-                &self.repository,
-            ),
-            field_line(
-                self.active_field == 2,
-                self.editing && self.active_field == 2,
-                "Clone path",
-                &self.repository_path,
-            ),
-            Line::default(),
-            Line::from("Enter edits the selected field. Right continues to disk selection."),
-            status_line(self.status_message.as_deref()),
-        ];
-
-        let paragraph = Paragraph::new(lines).wrap(Wrap { trim: false });
-        f.render_widget(paragraph, inner);
+        let section = FormSection::new(
+            "github",
+            vec![
+                form_field(
+                    "github user",
+                    self.github_username.clone(),
+                    Some("Used when repository is empty or repo name only".to_string()),
+                    FormFieldRole::Text,
+                ),
+                form_field(
+                    "repository",
+                    self.repository.clone(),
+                    Some("owner/name, repo name, URL, or empty for default".to_string()),
+                    FormFieldRole::Text,
+                ),
+                form_field(
+                    "clone path",
+                    self.repository_path.clone(),
+                    Some("Working clone used before copying to /mnt/etc/nixos".to_string()),
+                    FormFieldRole::Text,
+                ),
+                status_field(self.status_message.as_deref()),
+            ],
+            Some(self.active_field),
+            self.editing,
+        );
+        render_form_section(f, rect, &section);
     }
 }
 
@@ -141,31 +125,5 @@ impl GitHubLoginPage {
             1 => ConfigChange::Repository(self.repository.clone()),
             _ => ConfigChange::RepositoryPath(self.repository_path.clone()),
         }
-    }
-}
-
-fn field_line(active: bool, editing: bool, label: &str, value: &str) -> Line<'static> {
-    let marker = if active { ">" } else { " " };
-    let value = if value.is_empty() { "<empty>" } else { value };
-    let mut spans = vec![
-        Span::styled(marker, Style::default().fg(Color::Yellow)),
-        Span::raw(" "),
-        Span::styled(label.to_string(), Style::default().add_modifier(Modifier::BOLD)),
-        Span::raw(": "),
-        Span::raw(value.to_string()),
-    ];
-    if editing {
-        spans.push(Span::styled("  [editing]", Style::default().fg(Color::Green)));
-    }
-    Line::from(spans)
-}
-
-fn status_line(message: Option<&str>) -> Line<'static> {
-    match message {
-        Some(message) => Line::from(vec![
-            Span::styled("status: ", Style::default().fg(Color::Yellow)),
-            Span::raw(message.to_string()),
-        ]),
-        None => Line::default(),
     }
 }

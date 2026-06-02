@@ -1,17 +1,18 @@
 use ratatui::{
     crossterm::event::{KeyCode, KeyEvent},
     layout::Rect,
-    style::{Color, Modifier, Style},
-    text::{Line, Span},
-    widgets::{Block, Borders, Paragraph, Wrap},
 };
 
 use crate::{
     action::{Action, PendingUserChange},
     app::{AppSnapshot, PendingUser, Screen},
     component::Component,
+    components::{
+        Popup,
+        form::{FormFieldRole, FormSection, render_form_section},
+    },
     config::UserType,
-    pages::InstallerPage,
+    pages::{InstallerPage, form_field, status_field},
     terminal::Frame,
 };
 
@@ -35,6 +36,7 @@ pub struct UserMenuPage {
 pub struct PresetPasswordPage {
     active_field: usize,
     editing: bool,
+    username: String,
     password: String,
     password_confirm: String,
     status_message: Option<String>,
@@ -67,6 +69,7 @@ pub struct CustomProgramsPage {
 pub struct CustomPasswordPage {
     active_field: usize,
     editing: bool,
+    username: String,
     password: String,
     password_confirm: String,
     status_message: Option<String>,
@@ -128,7 +131,7 @@ impl Component for UserMenuPage {
                 self.selected = (self.selected + 1).min(USER_MENU_OPTIONS.len() - 1);
                 Action::Noop
             }
-            KeyCode::Left => Action::Navigate(Screen::SshToggle),
+            KeyCode::Left => Action::Navigate(Screen::StorageToggle),
             KeyCode::Right | KeyCode::Enter => match self.selected {
                 0 => Action::StartPresetUser(PendingUser::preset(
                     "jade-core",
@@ -171,42 +174,22 @@ impl Component for UserMenuPage {
     }
 
     fn render(&mut self, f: &mut Frame, rect: Rect) {
-        let block = Block::default()
-            .borders(Borders::ALL)
-            .title(" Users ")
-            .border_style(Style::default().fg(Color::Cyan));
-        let inner = block.inner(rect);
-        f.render_widget(block, rect);
+        let mut fields = USER_MENU_OPTIONS
+            .iter()
+            .enumerate()
+            .map(|(index, option)| {
+                form_field(
+                    *option,
+                    "default config",
+                    Some(user_menu_hint(index).to_string()),
+                    FormFieldRole::Choice,
+                )
+            })
+            .collect::<Vec<_>>();
+        fields.push(status_field(self.status_message.as_deref()));
 
-        let mut lines = vec![
-            Line::from("Add preset or custom users before starting the install."),
-            Line::default(),
-        ];
-        for (index, option) in USER_MENU_OPTIONS.iter().enumerate() {
-            lines.push(Line::from(vec![
-                Span::styled(
-                    if index == self.selected { "> " } else { "  " },
-                    Style::default().fg(Color::Yellow),
-                ),
-                Span::styled(
-                    option.to_string(),
-                    if index == self.selected {
-                        Style::default().add_modifier(Modifier::BOLD)
-                    } else {
-                        Style::default()
-                    },
-                ),
-            ]));
-        }
-        if let Some(message) = self.status_message.as_ref() {
-            lines.push(Line::default());
-            lines.push(Line::from(vec![
-                Span::styled("status: ", Style::default().fg(Color::Yellow)),
-                Span::raw(message.clone()),
-            ]));
-        }
-
-        f.render_widget(Paragraph::new(lines).wrap(Wrap { trim: false }), inner);
+        let section = FormSection::new("users", fields, Some(self.selected), false);
+        render_form_section(f, rect, &section);
     }
 }
 
@@ -218,9 +201,22 @@ impl InstallerPage for PresetPasswordPage {
     fn sync(&mut self, snapshot: &AppSnapshot) {
         self.status_message = snapshot.status_message.clone();
         if let Some(user) = snapshot.pending_user.as_ref() {
+            self.username = user.username.clone();
             self.password = user.password.clone();
             self.password_confirm = user.password_confirm.clone();
         }
+    }
+
+    fn popup(&self) -> Option<Popup> {
+        Some(password_popup(
+            "Preset Password",
+            "preset password",
+            &self.username,
+            &self.password,
+            &self.password_confirm,
+            self.active_field,
+            self.editing,
+        ))
     }
 }
 
@@ -237,16 +233,21 @@ impl Component for PresetPasswordPage {
     }
 
     fn render(&mut self, f: &mut Frame, rect: Rect) {
-        render_password_page(
-            f,
-            rect,
-            " Preset Password ",
-            &self.password,
-            &self.password_confirm,
-            self.active_field,
-            self.editing,
-            self.status_message.as_deref(),
+        let section = FormSection::new(
+            "preset password",
+            vec![
+                status_field(self.status_message.as_deref()),
+                form_field(
+                    "flow",
+                    "preset user password",
+                    Some("Password input is shown in the popup".to_string()),
+                    FormFieldRole::ReadOnly,
+                ),
+            ],
+            None,
+            false,
         );
+        render_form_section(f, rect, &section);
     }
 }
 
@@ -300,7 +301,9 @@ impl Component for CustomBasicPage {
                 KeyCode::Left => Action::Navigate(Screen::UserMenu),
                 KeyCode::Right => {
                     if self.username.trim().is_empty() || self.display_name.trim().is_empty() {
-                        Action::SetStatus(Some("Username and display name are required".to_string()))
+                        Action::SetStatus(Some(
+                            "Username and display name are required".to_string(),
+                        ))
                     } else {
                         Action::Navigate(Screen::CustomUserType)
                     }
@@ -311,33 +314,27 @@ impl Component for CustomBasicPage {
     }
 
     fn render(&mut self, f: &mut Frame, rect: Rect) {
-        let block = Block::default()
-            .borders(Borders::ALL)
-            .title(" Custom User ")
-            .border_style(Style::default().fg(Color::Cyan));
-        let inner = block.inner(rect);
-        f.render_widget(block, rect);
-
-        let lines = vec![
-            Line::from("Fill in the basic fields for a custom user."),
-            Line::default(),
-            text_field_line(
-                self.active_field == 0,
-                self.editing && self.active_field == 0,
-                "username",
-                &self.username,
-            ),
-            text_field_line(
-                self.active_field == 1,
-                self.editing && self.active_field == 1,
-                "display name",
-                &self.display_name,
-            ),
-            Line::default(),
-            status_line(self.status_message.as_deref()),
-        ];
-
-        f.render_widget(Paragraph::new(lines).wrap(Wrap { trim: false }), inner);
+        let section = FormSection::new(
+            "custom user",
+            vec![
+                form_field(
+                    "username",
+                    self.username.clone(),
+                    Some("Linux account name".to_string()),
+                    FormFieldRole::Text,
+                ),
+                form_field(
+                    "display name",
+                    self.display_name.clone(),
+                    Some("Human-readable user name".to_string()),
+                    FormFieldRole::Text,
+                ),
+                status_field(self.status_message.as_deref()),
+            ],
+            Some(self.active_field),
+            self.editing,
+        );
+        render_form_section(f, rect, &section);
     }
 }
 
@@ -390,15 +387,21 @@ impl Component for CustomTypePage {
 
     fn render(&mut self, f: &mut Frame, rect: Rect) {
         let options = ["gui", "tui", "cui"];
-        render_options_page(
-            f,
-            rect,
-            " User Type ",
-            "Select the default experience for this user.",
-            &options,
-            self.selected,
-            self.status_message.as_deref(),
-        );
+        let mut fields = options
+            .iter()
+            .map(|option| {
+                form_field(
+                    "user type",
+                    *option,
+                    Some("Select the default experience for this user".to_string()),
+                    FormFieldRole::Choice,
+                )
+            })
+            .collect::<Vec<_>>();
+        fields.push(status_field(self.status_message.as_deref()));
+
+        let section = FormSection::new("user type", fields, Some(self.selected), false);
+        render_form_section(f, rect, &section);
     }
 }
 
@@ -450,11 +453,9 @@ impl Component for CustomProgramsPage {
                 self.selected = (self.selected + 1).min(options.len() - 1);
                 Action::Noop
             }
-            KeyCode::Char(' ') => {
-                Action::PendingUserChanged(PendingUserChange::ToggleProgram(
-                    options[self.selected].to_string(),
-                ))
-            }
+            KeyCode::Char(' ') => Action::PendingUserChanged(PendingUserChange::ToggleProgram(
+                options[self.selected].to_string(),
+            )),
             KeyCode::Left => Action::Navigate(Screen::CustomUserType),
             KeyCode::Right | KeyCode::Enter => Action::Navigate(Screen::CustomUserPassword),
             _ => Action::Noop,
@@ -462,41 +463,23 @@ impl Component for CustomProgramsPage {
     }
 
     fn render(&mut self, f: &mut Frame, rect: Rect) {
-        let block = Block::default()
-            .borders(Borders::ALL)
-            .title(" Programs ")
-            .border_style(Style::default().fg(Color::Cyan));
-        let inner = block.inner(rect);
-        f.render_widget(block, rect);
-
         let options = program_options_for(self.user_type.unwrap_or(UserType::Gui));
-        let mut lines = vec![
-            Line::from("Toggle any program groups you want for the custom user."),
-            Line::default(),
-        ];
-        for (index, option) in options.iter().enumerate() {
-            let enabled = self.selected_programs.iter().any(|item| item == option);
-            lines.push(Line::from(vec![
-                Span::styled(
-                    if index == self.selected { "> " } else { "  " },
-                    Style::default().fg(Color::Yellow),
-                ),
-                Span::raw(if enabled { "[x] " } else { "[ ] " }),
-                Span::styled(
-                    option.to_string(),
-                    if index == self.selected {
-                        Style::default().add_modifier(Modifier::BOLD)
-                    } else {
-                        Style::default()
-                    },
-                ),
-            ]));
-        }
-        lines.push(Line::default());
-        lines.push(Line::from("Space toggles the highlighted program group."));
-        lines.push(status_line(self.status_message.as_deref()));
+        let mut fields = options
+            .iter()
+            .map(|option| {
+                let enabled = self.selected_programs.iter().any(|item| item == option);
+                form_field(
+                    *option,
+                    enabled.to_string(),
+                    Some("Space toggles the highlighted program group".to_string()),
+                    FormFieldRole::Toggle,
+                )
+            })
+            .collect::<Vec<_>>();
+        fields.push(status_field(self.status_message.as_deref()));
 
-        f.render_widget(Paragraph::new(lines).wrap(Wrap { trim: false }), inner);
+        let section = FormSection::new("programs", fields, Some(self.selected), false);
+        render_form_section(f, rect, &section);
     }
 }
 
@@ -508,9 +491,22 @@ impl InstallerPage for CustomPasswordPage {
     fn sync(&mut self, snapshot: &AppSnapshot) {
         self.status_message = snapshot.status_message.clone();
         if let Some(user) = snapshot.pending_user.as_ref() {
+            self.username = user.username.clone();
             self.password = user.password.clone();
             self.password_confirm = user.password_confirm.clone();
         }
+    }
+
+    fn popup(&self) -> Option<Popup> {
+        Some(password_popup(
+            "Custom Password",
+            "custom password",
+            &self.username,
+            &self.password,
+            &self.password_confirm,
+            self.active_field,
+            self.editing,
+        ))
     }
 }
 
@@ -527,16 +523,21 @@ impl Component for CustomPasswordPage {
     }
 
     fn render(&mut self, f: &mut Frame, rect: Rect) {
-        render_password_page(
-            f,
-            rect,
-            " Custom Password ",
-            &self.password,
-            &self.password_confirm,
-            self.active_field,
-            self.editing,
-            self.status_message.as_deref(),
+        let section = FormSection::new(
+            "custom password",
+            vec![
+                status_field(self.status_message.as_deref()),
+                form_field(
+                    "flow",
+                    "custom user password",
+                    Some("Password input is shown in the popup".to_string()),
+                    FormFieldRole::ReadOnly,
+                ),
+            ],
+            None,
+            false,
         );
+        render_form_section(f, rect, &section);
     }
 }
 
@@ -564,34 +565,37 @@ impl Component for UserAddResultPage {
     }
 
     fn render(&mut self, f: &mut Frame, rect: Rect) {
-        let block = Block::default()
-            .borders(Borders::ALL)
-            .title(" User Added ")
-            .border_style(Style::default().fg(Color::Green));
-        let inner = block.inner(rect);
-        f.render_widget(block, rect);
-
         let user = self.last_user.as_ref();
-        let lines = vec![
-            Line::from("The pending user has been committed to the install config."),
-            Line::default(),
-            Line::from(format!(
-                "username    : {}",
-                user.map(|value| value.username.as_str()).unwrap_or("<none>")
-            )),
-            Line::from(format!(
-                "display name: {}",
-                user.map(|value| value.display_name.as_str()).unwrap_or("<none>")
-            )),
-            Line::from(format!(
-                "type        : {}",
-                user.map(|value| value.user_type.label()).unwrap_or("<none>")
-            )),
-            Line::default(),
-            status_line(self.status_message.as_deref()),
-        ];
-
-        f.render_widget(Paragraph::new(lines).wrap(Wrap { trim: false }), inner);
+        let section = FormSection::new(
+            "user added",
+            vec![
+                form_field(
+                    "username",
+                    user.map(|value| value.username.as_str())
+                        .unwrap_or("<none>"),
+                    None,
+                    FormFieldRole::ReadOnly,
+                ),
+                form_field(
+                    "display name",
+                    user.map(|value| value.display_name.as_str())
+                        .unwrap_or("<none>"),
+                    None,
+                    FormFieldRole::ReadOnly,
+                ),
+                form_field(
+                    "type",
+                    user.map(|value| value.user_type.label())
+                        .unwrap_or("<none>"),
+                    None,
+                    FormFieldRole::ReadOnly,
+                ),
+                status_field(self.status_message.as_deref()),
+            ],
+            None,
+            false,
+        );
+        render_form_section(f, rect, &section);
     }
 }
 
@@ -652,52 +656,67 @@ fn current_password_field<'a>(
     }
 }
 
-fn password_change(
-    active_field: usize,
-    password: &String,
-    password_confirm: &String,
-) -> Action {
+fn password_change(active_field: usize, password: &str, password_confirm: &str) -> Action {
     match active_field {
-        0 => Action::PendingUserChanged(PendingUserChange::Password(password.clone())),
+        0 => Action::PendingUserChanged(PendingUserChange::Password(password.to_owned())),
         _ => Action::PendingUserChanged(PendingUserChange::PasswordConfirm(
-            password_confirm.clone(),
+            password_confirm.to_owned(),
         )),
     }
 }
 
-fn render_password_page(
-    f: &mut Frame,
-    rect: Rect,
+fn password_popup(
     title: &str,
+    section_title: &str,
+    username: &str,
     password: &str,
     password_confirm: &str,
     active_field: usize,
     editing: bool,
-    status_message: Option<&str>,
-) {
-    let block = Block::default()
-        .borders(Borders::ALL)
-        .title(title)
-        .border_style(Style::default().fg(Color::Cyan));
-    let inner = block.inner(rect);
-    f.render_widget(block, rect);
-
-    let lines = vec![
-        Line::from("Set the password for the pending user."),
-        Line::default(),
-        text_field_line(active_field == 0, editing && active_field == 0, "password", password),
-        text_field_line(
-            active_field == 1,
-            editing && active_field == 1,
-            "confirm",
-            password_confirm,
+) -> Popup {
+    Popup::new(
+        title,
+        72,
+        54,
+        FormSection::new(
+            section_title,
+            vec![
+                form_field(
+                    "password",
+                    password,
+                    Some(format!(
+                        "Password for {}",
+                        if username.is_empty() {
+                            "<pending>"
+                        } else {
+                            username
+                        }
+                    )),
+                    FormFieldRole::Text,
+                ),
+                form_field(
+                    "confirm",
+                    password_confirm,
+                    Some("Must match password".to_string()),
+                    FormFieldRole::Text,
+                ),
+            ],
+            Some(active_field),
+            editing,
         ),
-        Line::default(),
-        Line::from("Right commits the pending user into the install config."),
-        status_line(status_message),
-    ];
+    )
+}
 
-    f.render_widget(Paragraph::new(lines).wrap(Wrap { trim: false }), inner);
+fn user_menu_hint(index: usize) -> &'static str {
+    match index {
+        0 => "TUI core user; preset TUI user; password required",
+        1 => "KDE Plasma office user; preset GUI user; password required",
+        2 => "KDE Plasma gaming user; preset GUI user; password required",
+        3 => "Development GUI user; programming tools; password required",
+        4 => "Full GUI user; all program groups; password required",
+        5 => "Create a custom user from scratch",
+        _ => "Finish user setup and review install summary",
+    }
 }
 
 fn program_options_for(user_type: UserType) -> &'static [&'static str] {
@@ -705,70 +724,5 @@ fn program_options_for(user_type: UserType) -> &'static [&'static str] {
         UserType::Gui => &["browser", "office", "media", "sns", "programming", "gaming"],
         UserType::Tui => &["cli-tools", "git", "programming", "media"],
         UserType::Cui => &["base", "monitoring", "networking"],
-    }
-}
-
-fn render_options_page(
-    f: &mut Frame,
-    rect: Rect,
-    title: &str,
-    description: &str,
-    options: &[&str],
-    selected: usize,
-    status_message: Option<&str>,
-) {
-    let block = Block::default()
-        .borders(Borders::ALL)
-        .title(title)
-        .border_style(Style::default().fg(Color::Cyan));
-    let inner = block.inner(rect);
-    f.render_widget(block, rect);
-
-    let mut lines = vec![Line::from(description), Line::default()];
-    for (index, option) in options.iter().enumerate() {
-        lines.push(Line::from(vec![
-            Span::styled(
-                if index == selected { "> " } else { "  " },
-                Style::default().fg(Color::Yellow),
-            ),
-            Span::styled(
-                option.to_string(),
-                if index == selected {
-                    Style::default().add_modifier(Modifier::BOLD)
-                } else {
-                    Style::default()
-                },
-            ),
-        ]));
-    }
-    lines.push(Line::default());
-    lines.push(status_line(status_message));
-
-    f.render_widget(Paragraph::new(lines).wrap(Wrap { trim: false }), inner);
-}
-
-fn text_field_line(active: bool, editing: bool, label: &str, value: &str) -> Line<'static> {
-    let marker = if active { ">" } else { " " };
-    let value = if value.is_empty() { "<empty>" } else { value };
-    let mut spans = vec![
-        Span::styled(marker, Style::default().fg(Color::Yellow)),
-        Span::raw(" "),
-        Span::styled(label.to_string(), Style::default().add_modifier(Modifier::BOLD)),
-        Span::raw(": "),
-        Span::raw(value.to_string()),
-    ];
-    if editing {
-        spans.push(Span::styled("  [editing]", Style::default().fg(Color::Green)));
-    }
-    Line::from(spans)
-}
-
-fn status_line(message: Option<&str>) -> Line<'static> {
-    match message {
-        Some(message) => Line::from(vec![
-            Span::styled("status: ", Style::default().fg(Color::Yellow)),
-            Span::raw(message.to_string()),
-        ]),
-        None => Line::default(),
     }
 }

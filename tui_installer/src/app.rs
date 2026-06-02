@@ -3,7 +3,10 @@ use std::collections::HashMap;
 use color_eyre::eyre::Result;
 use ratatui::{
     Frame,
-    layout::{Constraint, Direction, Layout},
+    layout::{Constraint, Direction, Layout, Rect},
+    style::{Color, Modifier, Style},
+    text::{Line, Span, Text},
+    widgets::{Block, Borders, Paragraph, Wrap},
 };
 
 use crate::{
@@ -11,10 +14,14 @@ use crate::{
     component::Component,
     components::{Footer, Header, Sidebar},
     config::{
-        DeviceOption, HardwareInfo, InstallConfig, UserConfig, UserType, sample_devices,
-        sample_hardware,
+        DeviceOption, HardwareInfo, InstallConfig, UserConfig, UserType, apply_detected_config,
+        collect_block_devices, collect_hardware,
     },
     event::Event,
+    infra::{
+        github::prepare_github_repository, install::run_phase3_install,
+        network::check_network_connectivity, password_hasher::hash_password,
+    },
     pages::{InstallerPage, build_pages},
 };
 
@@ -52,6 +59,7 @@ pub enum Screen {
     LocaleSelect,
     TimezoneSelect,
     SshToggle,
+    StorageToggle,
     UserMenu,
     PresetUserPassword,
     CustomUserBasic,
@@ -60,39 +68,10 @@ pub enum Screen {
     CustomUserPassword,
     UserAddResult,
     Summary,
-    Installing,
     Done,
 }
 
 impl Screen {
-    pub const ORDER: [Self; 25] = [
-        Self::Welcome,
-        Self::GitHubLogin,
-        Self::DeviceSelect,
-        Self::PartitionConfig,
-        Self::PartitionConfirm,
-        Self::HostSelect,
-        Self::HostnameInput,
-        Self::HardwareDetect,
-        Self::GpuSelect,
-        Self::CpuSelect,
-        Self::BootTypeSelect,
-        Self::KeyboardSelect,
-        Self::LocaleSelect,
-        Self::TimezoneSelect,
-        Self::SshToggle,
-        Self::UserMenu,
-        Self::PresetUserPassword,
-        Self::CustomUserBasic,
-        Self::CustomUserType,
-        Self::CustomUserPrograms,
-        Self::CustomUserPassword,
-        Self::UserAddResult,
-        Self::Summary,
-        Self::Installing,
-        Self::Done,
-    ];
-
     pub fn title(self) -> &'static str {
         match self {
             Self::Welcome => "Welcome",
@@ -110,6 +89,7 @@ impl Screen {
             Self::LocaleSelect => "Locale",
             Self::TimezoneSelect => "Timezone",
             Self::SshToggle => "SSH",
+            Self::StorageToggle => "Storage",
             Self::UserMenu => "Users",
             Self::PresetUserPassword => "Preset Password",
             Self::CustomUserBasic => "Custom User",
@@ -118,7 +98,6 @@ impl Screen {
             Self::CustomUserPassword => "Custom Password",
             Self::UserAddResult => "User Added",
             Self::Summary => "Summary",
-            Self::Installing => "Installing",
             Self::Done => "Done",
         }
     }
@@ -139,7 +118,8 @@ impl Screen {
             | Self::KeyboardSelect
             | Self::LocaleSelect
             | Self::TimezoneSelect
-            | Self::SshToggle => Phase::PcConfig,
+            | Self::SshToggle
+            | Self::StorageToggle => Phase::PcConfig,
             Self::UserMenu
             | Self::PresetUserPassword
             | Self::CustomUserBasic
@@ -147,24 +127,8 @@ impl Screen {
             | Self::CustomUserPrograms
             | Self::CustomUserPassword
             | Self::UserAddResult => Phase::Users,
-            Self::Summary | Self::Installing | Self::Done => Phase::Install,
+            Self::Summary | Self::Done => Phase::Install,
         }
-    }
-
-    pub fn next(self) -> Self {
-        let index = Self::ORDER
-            .iter()
-            .position(|screen| *screen == self)
-            .unwrap_or(0);
-        Self::ORDER[(index + 1).min(Self::ORDER.len() - 1)]
-    }
-
-    pub fn previous(self) -> Self {
-        let index = Self::ORDER
-            .iter()
-            .position(|screen| *screen == self)
-            .unwrap_or(0);
-        Self::ORDER[index.saturating_sub(1)]
     }
 }
 
@@ -219,7 +183,6 @@ pub struct AppSnapshot {
     pub hardware: HardwareInfo,
     pub devices: Vec<DeviceOption>,
     pub install_log: Vec<String>,
-    pub size: (u16, u16),
 }
 
 pub struct App {
@@ -235,7 +198,6 @@ pub struct App {
     pub pages: HashMap<Screen, Box<dyn InstallerPage>>,
     pub hardware: HardwareInfo,
     pub devices: Vec<DeviceOption>,
-    pub size: (u16, u16),
 }
 
 impl App {
@@ -245,8 +207,16 @@ impl App {
             page.init()?;
         }
 
+        let hardware = collect_hardware();
+        let devices = collect_block_devices();
+        let mut config = InstallConfig::default();
+        apply_detected_config(&mut config, &hardware);
+        if let Some(device) = devices.first() {
+            config.device = device.path.clone();
+        }
+
         let mut app = Self {
-            config: InstallConfig::default(),
+            config,
             current_screen: Screen::Welcome,
             should_quit: false,
             status_message: None,
@@ -256,9 +226,8 @@ impl App {
             footer: Footer::new(),
             sidebar: Sidebar::new(),
             pages,
-            hardware: sample_hardware(),
-            devices: sample_devices(),
-            size: (0, 0),
+            hardware,
+            devices,
         };
 
         app.header.init()?;
@@ -281,7 +250,6 @@ impl App {
     }
 
     pub fn render(&mut self, frame: &mut Frame) {
-        self.size = (frame.area().width, frame.area().height);
         self.sync_components();
 
         let layout = Layout::default()
@@ -295,15 +263,40 @@ impl App {
 
         let body = Layout::default()
             .direction(Direction::Horizontal)
-            .constraints([Constraint::Percentage(70), Constraint::Percentage(30)])
+            .constraints([Constraint::Percentage(68), Constraint::Percentage(32)])
             .split(layout[1]);
 
         self.header.render(frame, layout[0]);
-        if let Some(page) = self.pages.get_mut(&self.current_screen) {
-            page.render(frame, body[0]);
-        }
+        let body_block = Block::default()
+            .borders(Borders::ALL)
+            .title(format!(" {} ", self.current_screen.title()))
+            .border_style(Style::default().fg(main_border_color(self.current_screen)));
+        let body_inner = body_block.inner(body[0]);
+        frame.render_widget(body_block, body[0]);
+
+        let body_inner_layout = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([Constraint::Length(3), Constraint::Min(3)])
+            .split(body_inner);
+
+        let page_info = Paragraph::new(page_info_text(self.current_screen))
+            .style(Style::default().fg(Color::Gray))
+            .wrap(Wrap { trim: false });
+        frame.render_widget(page_info, body_inner_layout[0]);
+
+        let popup = if let Some(page) = self.pages.get_mut(&self.current_screen) {
+            page.render(frame, body_inner_layout[1]);
+            page.popup()
+        } else {
+            None
+        };
+
         self.sidebar.render(frame, body[1]);
         self.footer.render(frame, layout[2]);
+
+        if let Some(popup) = popup {
+            popup.render(frame, frame.area());
+        }
     }
 
     fn process_action(&mut self, action: Action, depth: usize) {
@@ -340,21 +333,13 @@ impl App {
         match action {
             Action::Noop | Action::Batch(_) => {}
             Action::Quit => self.should_quit = true,
-            Action::Tick => {}
-            Action::Resize(width, height) => self.size = (width, height),
             Action::Navigate(screen) => {
                 self.current_screen = screen;
                 self.status_message = None;
             }
-            Action::NextScreen => {
-                self.current_screen = self.current_screen.next();
-                self.status_message = None;
-            }
-            Action::PrevScreen => {
-                self.current_screen = self.current_screen.previous();
-                self.status_message = None;
-            }
             Action::SetStatus(message) => self.status_message = message,
+            Action::CheckNetwork => self.check_network(),
+            Action::PrepareRepository => self.prepare_repository(),
             Action::ConfigChanged(change) => self.apply_config_change(change),
             Action::PendingUserChanged(change) => self.apply_pending_user_change(change),
             Action::StartPresetUser(user) => {
@@ -366,17 +351,7 @@ impl App {
             Action::ResetPendingUser => self.pending_user = None,
             Action::StartInstall => {
                 self.install_log.clear();
-                self.current_screen = Screen::Installing;
-                self.status_message = Some("Starting install flow".to_string());
-            }
-            Action::AppendInstallLog(line) => self.install_log.push(line),
-            Action::InstallComplete => {
-                self.current_screen = Screen::Done;
-                self.status_message = Some("Install flow completed".to_string());
-            }
-            Action::InstallFailed(message) => {
-                self.current_screen = Screen::Summary;
-                self.status_message = Some(message);
+                self.run_install();
             }
         }
     }
@@ -394,6 +369,7 @@ impl App {
             ConfigChange::Locale(value) => self.config.locale = value,
             ConfigChange::Timezone(value) => self.config.timezone = value,
             ConfigChange::SshEnabled(value) => self.config.ssh_enabled = value,
+            ConfigChange::StorageEnabled(value) => self.config.storage_enabled = value,
             ConfigChange::GpuType(value) => self.config.gpu_type = value,
             ConfigChange::GpuCustom(value) => self.config.gpu_custom = value,
             ConfigChange::CpuType(value) => self.config.cpu_type = value,
@@ -409,7 +385,11 @@ impl App {
             PendingUserChange::DisplayName(value) => pending_user.display_name = value,
             PendingUserChange::UserType(value) => pending_user.user_type = value,
             PendingUserChange::ToggleProgram(program) => {
-                if let Some(index) = pending_user.programs.iter().position(|item| item == &program) {
+                if let Some(index) = pending_user
+                    .programs
+                    .iter()
+                    .position(|item| item == &program)
+                {
                     pending_user.programs.remove(index);
                 } else {
                     pending_user.programs.push(program);
@@ -443,12 +423,20 @@ impl App {
             return;
         }
 
+        let password_hash = match hash_password(&user.password) {
+            Ok(hash) => hash,
+            Err(error) => {
+                self.status_message = Some(format!("Password hashing failed: {error}"));
+                return;
+            }
+        };
+
         self.config.users.push(UserConfig {
             username: user.username.clone(),
             display_name: user.display_name.clone(),
             user_type: user.user_type,
             programs: user.programs.clone(),
-            password_hash: format!("plain-text-placeholder:{}", user.password),
+            password_hash,
             is_preset: user.is_preset,
         });
         self.pending_user = Some(user.clone());
@@ -465,7 +453,6 @@ impl App {
             hardware: self.hardware.clone(),
             devices: self.devices.clone(),
             install_log: self.install_log.clone(),
-            size: self.size,
         }
     }
 
@@ -477,5 +464,100 @@ impl App {
         if let Some(page) = self.pages.get_mut(&self.current_screen) {
             page.sync(&snapshot);
         }
+    }
+
+    fn check_network(&mut self) {
+        match check_network_connectivity() {
+            Ok(()) => {
+                self.status_message = Some("Network check passed".to_string());
+                self.current_screen = Screen::GitHubLogin;
+            }
+            Err(error) => self.status_message = Some(error),
+        }
+    }
+
+    fn prepare_repository(&mut self) {
+        let mut logs = Vec::new();
+        match prepare_github_repository(&mut self.config, &mut logs) {
+            Ok(()) => {
+                self.install_log.extend(logs);
+                self.status_message =
+                    Some(format!("Repository ready: {}", self.config.repository_path));
+                self.current_screen = Screen::DeviceSelect;
+            }
+            Err(error) => {
+                self.install_log.extend(logs);
+                self.status_message = Some(error);
+            }
+        }
+    }
+
+    fn run_install(&mut self) {
+        match run_phase3_install(&self.config, &self.config.users, &mut self.install_log) {
+            Ok(()) => {
+                self.current_screen = Screen::Done;
+                self.status_message = Some("Installation complete. Review logs below.".to_string());
+            }
+            Err(error) => {
+                self.install_log.push(format!("install failed: {error}"));
+                self.current_screen = Screen::Done;
+                self.status_message = Some(format!("Installation failed: {error}"));
+            }
+        }
+    }
+}
+
+impl Component for App {
+    fn handle_events(&mut self, event: Option<Event>) -> Action {
+        self.handle_event(event)
+    }
+
+    fn update(&mut self, action: Action) -> Action {
+        App::update(self, action);
+        Action::Noop
+    }
+
+    fn render(&mut self, frame: &mut Frame, _rect: Rect) {
+        App::render(self, frame);
+    }
+}
+
+fn page_info_text(screen: Screen) -> Text<'static> {
+    Text::from(vec![
+        Line::from(vec![
+            Span::styled("phase: ", Style::default().fg(Color::DarkGray)),
+            Span::styled(
+                phase_label(screen.phase()),
+                Style::default()
+                    .fg(Color::White)
+                    .add_modifier(Modifier::BOLD),
+            ),
+        ]),
+        Line::from(vec![
+            Span::styled("screen: ", Style::default().fg(Color::DarkGray)),
+            Span::styled(
+                screen.title(),
+                Style::default()
+                    .fg(Color::White)
+                    .add_modifier(Modifier::BOLD),
+            ),
+        ]),
+    ])
+}
+
+fn phase_label(phase: Phase) -> &'static str {
+    match phase {
+        Phase::PcConfig => "PC Config",
+        Phase::Users => "Users",
+        Phase::Install => "Install",
+    }
+}
+
+fn main_border_color(screen: Screen) -> Color {
+    match screen {
+        Screen::Welcome | Screen::Done => Color::Green,
+        Screen::Summary => Color::Magenta,
+        Screen::UserMenu => Color::Cyan,
+        _ => Color::Blue,
     }
 }

@@ -3,6 +3,10 @@ use std::collections::HashMap;
 use crate::{
     app::{AppSnapshot, Screen},
     component::Component,
+    components::{
+        Popup,
+        form::{FormField, FormFieldRole},
+    },
 };
 
 mod device_select;
@@ -10,7 +14,6 @@ mod done;
 mod github_login;
 mod hardware_detect;
 mod host_select;
-mod installing;
 mod locale_select;
 mod partition_config;
 mod summary;
@@ -20,6 +23,27 @@ mod welcome;
 pub trait InstallerPage: Component {
     fn screen(&self) -> Screen;
     fn sync(&mut self, snapshot: &AppSnapshot);
+    fn popup(&self) -> Option<Popup> {
+        None
+    }
+}
+
+pub(crate) fn form_field(
+    label: impl Into<String>,
+    value: impl Into<String>,
+    hint: Option<String>,
+    role: FormFieldRole,
+) -> FormField {
+    FormField::new(label, value, hint, role)
+}
+
+pub(crate) fn status_field(message: Option<&str>) -> FormField {
+    form_field(
+        "status",
+        message.unwrap_or("ready"),
+        None,
+        FormFieldRole::ReadOnly,
+    )
 }
 
 pub fn build_pages() -> HashMap<Screen, Box<dyn InstallerPage>> {
@@ -41,6 +65,7 @@ pub fn build_pages() -> HashMap<Screen, Box<dyn InstallerPage>> {
         locale_select::locale_page(),
         locale_select::timezone_page(),
         locale_select::ssh_page(),
+        locale_select::storage_page(),
         user_menu::menu_page(),
         user_menu::preset_password_page(),
         user_menu::custom_basic_page(),
@@ -49,7 +74,6 @@ pub fn build_pages() -> HashMap<Screen, Box<dyn InstallerPage>> {
         user_menu::custom_password_page(),
         user_menu::result_page(),
         summary::page(),
-        installing::page(),
         done::page(),
     ] {
         pages.insert(page.screen(), page);

@@ -26,19 +26,20 @@ impl Component for Footer {
             Span::raw(" edit/confirm   "),
             "Right".green().bold(),
             Span::raw(" next   "),
+            "Esc".yellow().bold(),
+            Span::raw(" stop edit/back   "),
             "Left".yellow().bold(),
             Span::raw(" back   "),
-            "Up/Down".cyan().bold(),
-            Span::raw(" select   "),
+            "Tab/Up/Down".cyan().bold(),
+            Span::raw(" field   "),
+            "Type/Backspace".magenta().bold(),
+            Span::raw(" edit text   "),
             "Space".blue().bold(),
-            Span::raw(" toggle"),
+            Span::raw(" toggle/select"),
         ]);
 
-        let paragraph = Paragraph::new(line).block(
-            Block::default()
-                .borders(Borders::ALL)
-                .title(" controls "),
-        );
+        let paragraph =
+            Paragraph::new(line).block(Block::default().borders(Borders::ALL).title(" controls "));
         f.render_widget(paragraph, rect);
     }
 }

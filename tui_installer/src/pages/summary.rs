@@ -1,23 +1,26 @@
 use ratatui::{
     crossterm::event::{KeyCode, KeyEvent},
     layout::Rect,
-    style::{Color, Style},
-    text::{Line, Span},
-    widgets::{Block, Borders, Paragraph, Wrap},
 };
 
 use crate::{
     action::Action,
     app::{AppSnapshot, Screen},
     component::Component,
+    components::{
+        Popup,
+        form::{FormFieldRole, FormSection, render_form_section},
+    },
     config::InstallConfig,
-    pages::InstallerPage,
+    pages::{InstallerPage, form_field, status_field},
     terminal::Frame,
 };
 
 #[derive(Default)]
 pub struct SummaryPage {
     config: InstallConfig,
+    confirmation: String,
+    editing: bool,
     status_message: Option<String>,
 }
 
@@ -34,51 +37,143 @@ impl InstallerPage for SummaryPage {
         self.config = snapshot.config.clone();
         self.status_message = snapshot.status_message.clone();
     }
+
+    fn popup(&self) -> Option<Popup> {
+        Some(Popup::new(
+            "Summary",
+            72,
+            36,
+            FormSection::new(
+                "install confirmation",
+                vec![form_field(
+                    "confirmation",
+                    self.confirmation.clone(),
+                    Some("Type yes before starting install".to_string()),
+                    FormFieldRole::Text,
+                )],
+                Some(0),
+                self.editing,
+            ),
+        ))
+    }
 }
 
 impl Component for SummaryPage {
     fn handle_key_events(&mut self, key: KeyEvent) -> Action {
-        match key.code {
-            KeyCode::Char('q') => Action::Quit,
-            KeyCode::Left => Action::Navigate(Screen::UserMenu),
-            KeyCode::Right | KeyCode::Enter => Action::StartInstall,
-            _ => Action::Noop,
+        if self.editing {
+            match key.code {
+                KeyCode::Esc | KeyCode::Enter => {
+                    self.editing = false;
+                    Action::Noop
+                }
+                KeyCode::Backspace => {
+                    self.confirmation.pop();
+                    Action::Noop
+                }
+                KeyCode::Char(c) => {
+                    self.confirmation.push(c);
+                    Action::Noop
+                }
+                _ => Action::Noop,
+            }
+        } else {
+            match key.code {
+                KeyCode::Char('q') => Action::Quit,
+                KeyCode::Left => Action::Navigate(Screen::UserMenu),
+                KeyCode::Enter => {
+                    self.editing = true;
+                    Action::Noop
+                }
+                KeyCode::Right => {
+                    if self.confirmation.trim() == "yes" {
+                        Action::StartInstall
+                    } else {
+                        Action::SetStatus(Some(
+                            "Type 'yes' in confirm field before starting install".to_string(),
+                        ))
+                    }
+                }
+                _ => Action::Noop,
+            }
         }
     }
 
     fn render(&mut self, f: &mut Frame, rect: Rect) {
-        let block = Block::default()
-            .borders(Borders::ALL)
-            .title(" Summary ")
-            .border_style(Style::default().fg(Color::Magenta));
-        let inner = block.inner(rect);
-        f.render_widget(block, rect);
-
-        let mut lines = vec![
-            Line::from("Review the selected values and then start the install flow."),
-            Line::default(),
-            Line::from(format!("github user : {}", self.config.github_username)),
-            Line::from(format!("repository  : {}", self.config.repository)),
-            Line::from(format!("device      : {}", self.config.device)),
-            Line::from(format!("hostname    : {}", self.config.hostname)),
-            Line::from(format!("keyboard    : {}", self.config.keyboard)),
-            Line::from(format!("locale      : {}", self.config.locale)),
-            Line::from(format!("timezone    : {}", self.config.timezone)),
-            Line::from(format!("gpu         : {}", gpu_display(&self.config))),
-            Line::from(format!("cpu         : {}", cpu_display(&self.config))),
-            Line::from(format!("boot        : {}", self.config.boot_type.label())),
-            Line::from(format!("users       : {}", self.config.users.len())),
-            Line::default(),
-            Line::from("Press Right to switch to the simulated install log."),
-        ];
-        if let Some(message) = self.status_message.as_ref() {
-            lines.push(Line::from(vec![
-                Span::styled("status: ", Style::default().fg(Color::Yellow)),
-                Span::raw(message.clone()),
-            ]));
-        }
-
-        f.render_widget(Paragraph::new(lines).wrap(Wrap { trim: false }), inner);
+        let section = FormSection::new(
+            "summary",
+            vec![
+                form_field(
+                    "repository",
+                    self.config.repository.clone(),
+                    None,
+                    FormFieldRole::ReadOnly,
+                ),
+                form_field(
+                    "device",
+                    self.config.device.clone(),
+                    None,
+                    FormFieldRole::ReadOnly,
+                ),
+                form_field(
+                    "hostname",
+                    self.config.hostname.clone(),
+                    None,
+                    FormFieldRole::ReadOnly,
+                ),
+                form_field(
+                    "keyboard",
+                    self.config.keyboard.clone(),
+                    None,
+                    FormFieldRole::ReadOnly,
+                ),
+                form_field(
+                    "locale",
+                    self.config.locale.clone(),
+                    None,
+                    FormFieldRole::ReadOnly,
+                ),
+                form_field(
+                    "timezone",
+                    self.config.timezone.clone(),
+                    None,
+                    FormFieldRole::ReadOnly,
+                ),
+                form_field(
+                    "storage",
+                    self.config.storage_enabled.to_string(),
+                    None,
+                    FormFieldRole::Toggle,
+                ),
+                form_field(
+                    "gpu",
+                    gpu_display(&self.config),
+                    None,
+                    FormFieldRole::ReadOnly,
+                ),
+                form_field(
+                    "cpu",
+                    cpu_display(&self.config),
+                    None,
+                    FormFieldRole::ReadOnly,
+                ),
+                form_field(
+                    "boot",
+                    self.config.boot_type.label(),
+                    None,
+                    FormFieldRole::ReadOnly,
+                ),
+                form_field(
+                    "users",
+                    self.config.users.len().to_string(),
+                    None,
+                    FormFieldRole::ReadOnly,
+                ),
+                status_field(self.status_message.as_deref()),
+            ],
+            None,
+            false,
+        );
+        render_form_section(f, rect, &section);
     }
 }
 

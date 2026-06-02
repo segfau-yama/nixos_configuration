@@ -4,13 +4,11 @@ mod component;
 mod components;
 mod config;
 mod event;
+mod infra;
 mod pages;
 mod terminal;
 
-use std::{
-    io::{self, stdout},
-    time::Duration,
-};
+use std::io::{self, stdout};
 
 use color_eyre::eyre::Result;
 use crossterm::{
@@ -34,7 +32,7 @@ fn main() -> Result<()> {
 
 fn run(terminal: &mut TuiTerminal) -> Result<()> {
     let mut app = App::new()?;
-    let mut events = EventHandler::new(Duration::from_millis(80));
+    let mut events = EventHandler::new();
 
     while !app.should_quit {
         let event = events.next()?;

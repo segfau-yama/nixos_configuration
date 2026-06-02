@@ -1,16 +1,14 @@
 use ratatui::{
     crossterm::event::{KeyCode, KeyEvent},
     layout::Rect,
-    style::{Color, Modifier, Style},
-    text::{Line, Span},
-    widgets::{Block, Borders, Paragraph, Wrap},
 };
 
 use crate::{
     action::Action,
     app::{AppSnapshot, Screen},
     component::Component,
-    pages::InstallerPage,
+    components::form::{FormFieldRole, FormSection, render_form_section},
+    pages::{InstallerPage, form_field, status_field},
     terminal::Frame,
 };
 
@@ -37,43 +35,32 @@ impl Component for WelcomePage {
     fn handle_key_events(&mut self, key: KeyEvent) -> Action {
         match key.code {
             KeyCode::Char('q') => Action::Quit,
-            KeyCode::Right | KeyCode::Enter => Action::Navigate(Screen::GitHubLogin),
+            KeyCode::Right | KeyCode::Enter => Action::CheckNetwork,
             _ => Action::Noop,
         }
     }
 
     fn render(&mut self, f: &mut Frame, rect: Rect) {
-        let block = Block::default()
-            .borders(Borders::ALL)
-            .title(" Welcome ")
-            .border_style(Style::default().fg(Color::Green));
-        let inner = block.inner(rect);
-        f.render_widget(block, rect);
-
-        let mut lines = vec![
-            Line::from(Span::styled(
-                "JadeOS TUI Installer Prototype",
-                Style::default()
-                    .fg(Color::Cyan)
-                    .add_modifier(Modifier::BOLD),
-            )),
-            Line::default(),
-            Line::from("This crate demonstrates a component-oriented ratatui architecture."),
-            Line::from("Each screen is implemented as a page component first."),
-            Line::from("Shared widgets are limited to the header, footer, and sidebar."),
-            Line::default(),
-            Line::from("Press Right or Enter to begin configuring the installer."),
-        ];
-
-        if let Some(message) = self.status_message.as_ref() {
-            lines.push(Line::default());
-            lines.push(Line::from(vec![
-                Span::styled("status: ", Style::default().fg(Color::Yellow)),
-                Span::raw(message.clone()),
-            ]));
-        }
-
-        let paragraph = Paragraph::new(lines).wrap(Wrap { trim: false });
-        f.render_widget(paragraph, inner);
+        let section = FormSection::new(
+            "welcome",
+            vec![
+                status_field(self.status_message.as_deref()),
+                form_field(
+                    "mode",
+                    "interactive installer",
+                    Some("Press Enter or Right to run network check".to_string()),
+                    FormFieldRole::ReadOnly,
+                ),
+                form_field(
+                    "architecture",
+                    "component pages + shared form renderer",
+                    Some("Each page owns event handling, state, update, and render".to_string()),
+                    FormFieldRole::ReadOnly,
+                ),
+            ],
+            None,
+            false,
+        );
+        render_form_section(f, rect, &section);
     }
 }

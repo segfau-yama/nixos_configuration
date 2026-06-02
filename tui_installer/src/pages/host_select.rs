@@ -1,16 +1,14 @@
 use ratatui::{
     crossterm::event::{KeyCode, KeyEvent},
     layout::Rect,
-    style::{Color, Modifier, Style},
-    text::{Line, Span},
-    widgets::{Block, Borders, Paragraph, Wrap},
 };
 
 use crate::{
     action::{Action, ConfigChange},
     app::{AppSnapshot, Screen},
     component::Component,
-    pages::InstallerPage,
+    components::form::{FormFieldRole, FormSection, render_form_section},
+    pages::{InstallerPage, form_field, status_field},
     terminal::Frame,
 };
 
@@ -68,9 +66,7 @@ impl Component for HostSelectPage {
                     Action::Navigate(Screen::HardwareDetect),
                 ]),
                 1 => Action::Batch(vec![
-                    Action::ConfigChanged(ConfigChange::Hostname(
-                        "virtual-machine".to_string(),
-                    )),
+                    Action::ConfigChanged(ConfigChange::Hostname("virtual-machine".to_string())),
                     Action::Navigate(Screen::HardwareDetect),
                 ]),
                 _ => Action::Navigate(Screen::HostnameInput),
@@ -80,43 +76,22 @@ impl Component for HostSelectPage {
     }
 
     fn render(&mut self, f: &mut Frame, rect: Rect) {
-        let block = Block::default()
-            .borders(Borders::ALL)
-            .title(" Host Select ")
-            .border_style(Style::default().fg(Color::Blue));
-        let inner = block.inner(rect);
-        f.render_widget(block, rect);
-
         let options = ["laptop", "virtual-machine", "custom"];
-        let mut lines = vec![
-            Line::from("Pick a host preset or continue with a custom hostname."),
-            Line::default(),
-        ];
-        for (index, option) in options.iter().enumerate() {
-            lines.push(Line::from(vec![
-                Span::styled(
-                    if index == self.selected { "> " } else { "  " },
-                    Style::default().fg(Color::Yellow),
-                ),
-                Span::styled(
-                    option.to_string(),
-                    if index == self.selected {
-                        Style::default().add_modifier(Modifier::BOLD)
-                    } else {
-                        Style::default()
-                    },
-                ),
-            ]));
-        }
-        if let Some(message) = self.status_message.as_ref() {
-            lines.push(Line::default());
-            lines.push(Line::from(vec![
-                Span::styled("status: ", Style::default().fg(Color::Yellow)),
-                Span::raw(message.clone()),
-            ]));
-        }
+        let mut fields = options
+            .iter()
+            .map(|option| {
+                form_field(
+                    "host preset",
+                    *option,
+                    Some("Enter confirms preset; custom opens hostname input".to_string()),
+                    FormFieldRole::Choice,
+                )
+            })
+            .collect::<Vec<_>>();
+        fields.push(status_field(self.status_message.as_deref()));
 
-        f.render_widget(Paragraph::new(lines).wrap(Wrap { trim: false }), inner);
+        let section = FormSection::new("host", fields, Some(self.selected), false);
+        render_form_section(f, rect, &section);
     }
 }
 
@@ -158,32 +133,20 @@ impl Component for HostnameInputPage {
     }
 
     fn render(&mut self, f: &mut Frame, rect: Rect) {
-        let block = Block::default()
-            .borders(Borders::ALL)
-            .title(" Hostname ")
-            .border_style(Style::default().fg(Color::Blue));
-        let inner = block.inner(rect);
-        f.render_widget(block, rect);
-
-        let lines = vec![
-            Line::from("Type the hostname directly. This page always accepts text input."),
-            Line::default(),
-            Line::from(vec![
-                Span::styled("hostname", Style::default().add_modifier(Modifier::BOLD)),
-                Span::raw(": "),
-                Span::raw(self.hostname.clone()),
-            ]),
-            Line::default(),
-            Line::from("Right continues to hardware detection."),
-            match self.status_message.as_ref() {
-                Some(message) => Line::from(vec![
-                    Span::styled("status: ", Style::default().fg(Color::Yellow)),
-                    Span::raw(message.clone()),
-                ]),
-                None => Line::default(),
-            },
-        ];
-
-        f.render_widget(Paragraph::new(lines).wrap(Wrap { trim: false }), inner);
+        let section = FormSection::new(
+            "hostname",
+            vec![
+                form_field(
+                    "hostname",
+                    self.hostname.clone(),
+                    Some("Use lowercase letters, numbers, and hyphen".to_string()),
+                    FormFieldRole::Text,
+                ),
+                status_field(self.status_message.as_deref()),
+            ],
+            Some(0),
+            true,
+        );
+        render_form_section(f, rect, &section);
     }
 }

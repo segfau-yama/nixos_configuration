@@ -1,17 +1,15 @@
 use ratatui::{
     crossterm::event::{KeyCode, KeyEvent},
     layout::Rect,
-    style::{Color, Modifier, Style},
-    text::{Line, Span},
-    widgets::{Block, Borders, Paragraph, Wrap},
 };
 
 use crate::{
     action::{Action, ConfigChange},
     app::{AppSnapshot, Screen},
     component::Component,
+    components::form::{FormFieldRole, FormSection, render_form_section},
     config::{BootType, CpuType, GpuType, HardwareInfo},
-    pages::InstallerPage,
+    pages::{InstallerPage, form_field, status_field},
     terminal::Frame,
 };
 
@@ -85,13 +83,6 @@ impl Component for HardwareDetectPage {
     }
 
     fn render(&mut self, f: &mut Frame, rect: Rect) {
-        let block = Block::default()
-            .borders(Borders::ALL)
-            .title(" Hardware Detect ")
-            .border_style(Style::default().fg(Color::Blue));
-        let inner = block.inner(rect);
-        f.render_widget(block, rect);
-
         let hardware = self.hardware.clone().unwrap_or(HardwareInfo {
             cpu_brand: "unknown".to_string(),
             gpu_brand: "unknown".to_string(),
@@ -99,25 +90,33 @@ impl Component for HardwareDetectPage {
             gpu_type: GpuType::None,
             boot_type: BootType::SystemdBoot,
         });
-
-        let mut lines = vec![
-            Line::from("Detected hardware is used as the starting point for later screens."),
-            Line::default(),
-            Line::from(format!("CPU brand : {}", hardware.cpu_brand)),
-            Line::from(format!("CPU type  : {}", hardware.cpu_type.label())),
-            Line::from(format!("GPU brand : {}", hardware.gpu_brand)),
-            Line::from(format!("GPU type  : {}", hardware.gpu_type.label())),
-            Line::from(format!("Boot type : {}", hardware.boot_type.label())),
-        ];
-        if let Some(message) = self.status_message.as_ref() {
-            lines.push(Line::default());
-            lines.push(Line::from(vec![
-                Span::styled("status: ", Style::default().fg(Color::Yellow)),
-                Span::raw(message.clone()),
-            ]));
-        }
-
-        f.render_widget(Paragraph::new(lines).wrap(Wrap { trim: false }), inner);
+        let section = FormSection::new(
+            "hardware",
+            vec![
+                form_field(
+                    "detected cpu",
+                    hardware.cpu_brand,
+                    Some(format!("cpu type: {}", hardware.cpu_type.label())),
+                    FormFieldRole::ReadOnly,
+                ),
+                form_field(
+                    "detected gpu",
+                    hardware.gpu_brand,
+                    Some(format!("gpu type: {}", hardware.gpu_type.label())),
+                    FormFieldRole::ReadOnly,
+                ),
+                form_field(
+                    "boot type",
+                    hardware.boot_type.label(),
+                    Some("detected from firmware".to_string()),
+                    FormFieldRole::ReadOnly,
+                ),
+                status_field(self.status_message.as_deref()),
+            ],
+            None,
+            false,
+        );
+        render_form_section(f, rect, &section);
     }
 }
 
@@ -183,15 +182,25 @@ impl Component for GpuSelectPage {
     }
 
     fn render(&mut self, f: &mut Frame, rect: Rect) {
-        render_choice_page(
+        render_choice_form(
             f,
             rect,
-            " GPU ",
-            "Choose the GPU driver family or enter a custom label.",
-            GPU_OPTIONS,
-            self.selected,
-            Some((&self.custom_value, self.editing_custom)),
-            self.status_message.as_deref(),
+            ChoiceForm {
+                title: "gpu",
+                label: "selection",
+                value: GPU_OPTIONS[self.selected],
+                hint: Some(format!(
+                    "Space/Up/Down: cycle -> custom | {}",
+                    GPU_OPTIONS.join(" / ")
+                )),
+                custom: Some((&self.custom_value, self.editing_custom)),
+                active_field: if self.editing_custom {
+                    Some(1)
+                } else {
+                    Some(0)
+                },
+                status_message: self.status_message.as_deref(),
+            },
         );
     }
 }
@@ -283,15 +292,25 @@ impl Component for CpuSelectPage {
     }
 
     fn render(&mut self, f: &mut Frame, rect: Rect) {
-        render_choice_page(
+        render_choice_form(
             f,
             rect,
-            " CPU ",
-            "Choose the CPU family or enter a custom label.",
-            CPU_OPTIONS,
-            self.selected,
-            Some((&self.custom_value, self.editing_custom)),
-            self.status_message.as_deref(),
+            ChoiceForm {
+                title: "cpu",
+                label: "selection",
+                value: CPU_OPTIONS[self.selected],
+                hint: Some(format!(
+                    "Space/Up/Down: cycle -> custom | {}",
+                    CPU_OPTIONS.join(" / ")
+                )),
+                custom: Some((&self.custom_value, self.editing_custom)),
+                active_field: if self.editing_custom {
+                    Some(1)
+                } else {
+                    Some(0)
+                },
+                status_message: self.status_message.as_deref(),
+            },
         );
     }
 }
@@ -345,15 +364,21 @@ impl Component for BootTypeSelectPage {
     }
 
     fn render(&mut self, f: &mut Frame, rect: Rect) {
-        render_choice_page(
+        render_choice_form(
             f,
             rect,
-            " Boot Type ",
-            "Pick the boot loader strategy for the target machine.",
-            BOOT_OPTIONS,
-            self.selected,
-            None,
-            self.status_message.as_deref(),
+            ChoiceForm {
+                title: "boot type",
+                label: "selection",
+                value: BOOT_OPTIONS[self.selected],
+                hint: Some(format!(
+                    "Space/Up/Down: cycle | {}",
+                    BOOT_OPTIONS.join(" / ")
+                )),
+                custom: None,
+                active_field: Some(0),
+                status_message: self.status_message.as_deref(),
+            },
         );
     }
 }
@@ -370,60 +395,38 @@ impl BootTypeSelectPage {
     }
 }
 
-fn render_choice_page(
-    f: &mut Frame,
-    rect: Rect,
-    title: &str,
-    description: &str,
-    options: &[&str],
-    selected: usize,
-    custom: Option<(&str, bool)>,
-    status_message: Option<&str>,
-) {
-    let block = Block::default()
-        .borders(Borders::ALL)
-        .title(title)
-        .border_style(Style::default().fg(Color::Blue));
-    let inner = block.inner(rect);
-    f.render_widget(block, rect);
+struct ChoiceForm<'a> {
+    title: &'a str,
+    label: &'a str,
+    value: &'a str,
+    hint: Option<String>,
+    custom: Option<(&'a str, bool)>,
+    active_field: Option<usize>,
+    status_message: Option<&'a str>,
+}
 
-    let mut lines = vec![Line::from(description), Line::default()];
-    for (index, option) in options.iter().enumerate() {
-        lines.push(Line::from(vec![
-            Span::styled(
-                if index == selected { "> " } else { "  " },
-                Style::default().fg(Color::Yellow),
-            ),
-            Span::styled(
-                option.to_string(),
-                if index == selected {
-                    Style::default().add_modifier(Modifier::BOLD)
-                } else {
-                    Style::default()
-                },
-            ),
-        ]));
+fn render_choice_form(f: &mut Frame, rect: Rect, form: ChoiceForm<'_>) {
+    let mut fields = vec![form_field(
+        form.label,
+        form.value,
+        form.hint,
+        FormFieldRole::Choice,
+    )];
+    if let Some((value, _editing)) = form.custom {
+        fields.push(form_field(
+            "custom value",
+            value,
+            Some("Type when selection is custom".to_string()),
+            FormFieldRole::Text,
+        ));
     }
-    if let Some((value, editing)) = custom {
-        lines.push(Line::default());
-        lines.push(Line::from(vec![
-            Span::styled("custom", Style::default().add_modifier(Modifier::BOLD)),
-            Span::raw(": "),
-            Span::raw(value.to_string()),
-            if editing {
-                Span::styled("  [editing]", Style::default().fg(Color::Green))
-            } else {
-                Span::raw("")
-            },
-        ]));
-    }
-    if let Some(message) = status_message {
-        lines.push(Line::default());
-        lines.push(Line::from(vec![
-            Span::styled("status: ", Style::default().fg(Color::Yellow)),
-            Span::raw(message.to_string()),
-        ]));
-    }
+    fields.push(status_field(form.status_message));
 
-    f.render_widget(Paragraph::new(lines).wrap(Wrap { trim: false }), inner);
+    let section = FormSection::new(
+        form.title,
+        fields,
+        form.active_field,
+        form.custom.map(|(_, editing)| editing).unwrap_or(false),
+    );
+    render_form_section(f, rect, &section);
 }

@@ -1,16 +1,17 @@
 use ratatui::{
     crossterm::event::{KeyCode, KeyEvent},
     layout::Rect,
-    style::{Color, Modifier, Style},
-    text::{Line, Span},
-    widgets::{Block, Borders, Paragraph, Wrap},
 };
 
 use crate::{
     action::{Action, ConfigChange},
     app::{AppSnapshot, Screen},
     component::Component,
-    pages::InstallerPage,
+    components::{
+        Popup,
+        form::{FormFieldRole, FormSection, render_form_section},
+    },
+    pages::{InstallerPage, form_field, status_field},
     terminal::Frame,
 };
 
@@ -25,8 +26,11 @@ pub struct PartitionConfigPage {
 
 #[derive(Default)]
 pub struct PartitionConfirmPage {
+    device: String,
     boot_size: String,
     swap_size: String,
+    confirmation: String,
+    editing: bool,
     status_message: Option<String>,
 }
 
@@ -97,35 +101,27 @@ impl Component for PartitionConfigPage {
     }
 
     fn render(&mut self, f: &mut Frame, rect: Rect) {
-        let block = Block::default()
-            .borders(Borders::ALL)
-            .title(" Partition Config ")
-            .border_style(Style::default().fg(Color::Blue));
-        let inner = block.inner(rect);
-        f.render_widget(block, rect);
-
-        let lines = vec![
-            Line::from("Choose the EFI and swap partition sizes."),
-            Line::default(),
-            field_line(
-                self.active_field == 0,
-                self.editing && self.active_field == 0,
-                "Boot size",
-                &self.boot_size,
-            ),
-            field_line(
-                self.active_field == 1,
-                self.editing && self.active_field == 1,
-                "Swap size",
-                &self.swap_size,
-            ),
-            Line::default(),
-            Line::from("Use values like 512MiB and 0 for disabled swap."),
-            status_line(self.status_message.as_deref()),
-        ];
-
-        let paragraph = Paragraph::new(lines).wrap(Wrap { trim: false });
-        f.render_widget(paragraph, inner);
+        let section = FormSection::new(
+            "partition",
+            vec![
+                form_field(
+                    "boot size",
+                    self.boot_size.clone(),
+                    Some("Default: 512MiB".to_string()),
+                    FormFieldRole::Text,
+                ),
+                form_field(
+                    "swap size",
+                    self.swap_size.clone(),
+                    Some("Use 0 to disable swap; root uses remaining disk".to_string()),
+                    FormFieldRole::Text,
+                ),
+                status_field(self.status_message.as_deref()),
+            ],
+            Some(self.active_field),
+            self.editing,
+        );
+        render_form_section(f, rect, &section);
     }
 }
 
@@ -151,66 +147,96 @@ impl InstallerPage for PartitionConfirmPage {
     }
 
     fn sync(&mut self, snapshot: &AppSnapshot) {
+        self.device = snapshot.config.device.clone();
         self.boot_size = snapshot.config.boot_size.clone();
         self.swap_size = snapshot.config.swap_size.clone();
         self.status_message = snapshot.status_message.clone();
+    }
+
+    fn popup(&self) -> Option<Popup> {
+        Some(Popup::new(
+            "Partition Confirm",
+            72,
+            36,
+            FormSection::new(
+                "partition confirmation",
+                vec![form_field(
+                    "confirmation",
+                    self.confirmation.clone(),
+                    Some("Type yes to confirm destructive partitioning".to_string()),
+                    FormFieldRole::Text,
+                )],
+                Some(0),
+                self.editing,
+            ),
+        ))
     }
 }
 
 impl Component for PartitionConfirmPage {
     fn handle_key_events(&mut self, key: KeyEvent) -> Action {
-        match key.code {
-            KeyCode::Char('q') => Action::Quit,
-            KeyCode::Left => Action::Navigate(Screen::PartitionConfig),
-            KeyCode::Right | KeyCode::Enter => Action::Navigate(Screen::HostSelect),
-            _ => Action::Noop,
+        if self.editing {
+            match key.code {
+                KeyCode::Esc | KeyCode::Enter => {
+                    self.editing = false;
+                    Action::Noop
+                }
+                KeyCode::Backspace => {
+                    self.confirmation.pop();
+                    Action::Noop
+                }
+                KeyCode::Char(c) => {
+                    self.confirmation.push(c);
+                    Action::Noop
+                }
+                _ => Action::Noop,
+            }
+        } else {
+            match key.code {
+                KeyCode::Char('q') => Action::Quit,
+                KeyCode::Left | KeyCode::Esc => Action::Navigate(Screen::PartitionConfig),
+                KeyCode::Enter => {
+                    self.editing = true;
+                    Action::Noop
+                }
+                KeyCode::Right => {
+                    if self.confirmation.trim() == "yes" {
+                        Action::Navigate(Screen::HostSelect)
+                    } else {
+                        Action::SetStatus(Some(
+                            "Type 'yes' in confirm field before continuing".to_string(),
+                        ))
+                    }
+                }
+                _ => Action::Noop,
+            }
         }
     }
 
     fn render(&mut self, f: &mut Frame, rect: Rect) {
-        let block = Block::default()
-            .borders(Borders::ALL)
-            .title(" Partition Confirm ")
-            .border_style(Style::default().fg(Color::Yellow));
-        let inner = block.inner(rect);
-        f.render_widget(block, rect);
-
-        let lines = vec![
-            Line::from("Review the partition layout before proceeding."),
-            Line::default(),
-            Line::from(format!("EFI partition : {}", self.boot_size)),
-            Line::from(format!("Swap partition: {}", self.swap_size)),
-            Line::from("Root partition : remaining disk"),
-            Line::default(),
-            Line::from("Right accepts this layout and continues to host selection."),
-            status_line(self.status_message.as_deref()),
-        ];
-
-        f.render_widget(Paragraph::new(lines).wrap(Wrap { trim: false }), inner);
-    }
-}
-
-fn field_line(active: bool, editing: bool, label: &str, value: &str) -> Line<'static> {
-    let marker = if active { ">" } else { " " };
-    let mut spans = vec![
-        Span::styled(marker, Style::default().fg(Color::Yellow)),
-        Span::raw(" "),
-        Span::styled(label.to_string(), Style::default().add_modifier(Modifier::BOLD)),
-        Span::raw(": "),
-        Span::raw(value.to_string()),
-    ];
-    if editing {
-        spans.push(Span::styled("  [editing]", Style::default().fg(Color::Green)));
-    }
-    Line::from(spans)
-}
-
-fn status_line(message: Option<&str>) -> Line<'static> {
-    match message {
-        Some(message) => Line::from(vec![
-            Span::styled("status: ", Style::default().fg(Color::Yellow)),
-            Span::raw(message.to_string()),
-        ]),
-        None => Line::default(),
+        let section = FormSection::new(
+            "partition",
+            vec![
+                form_field(
+                    "target disk",
+                    self.device.clone(),
+                    Some("This disk will be repartitioned and formatted".to_string()),
+                    FormFieldRole::ReadOnly,
+                ),
+                form_field(
+                    "layout",
+                    format!(
+                        "boot: {}, swap: {}, root: remaining disk",
+                        self.boot_size, self.swap_size
+                    ),
+                    Some("Confirm destructive operation in popup".to_string()),
+                    FormFieldRole::ReadOnly,
+                ),
+                status_field(self.status_message.as_deref()),
+            ],
+            None,
+            false,
+        );
+        render_form_section(f, rect, &section);
     }
 }

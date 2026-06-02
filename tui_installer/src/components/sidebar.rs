@@ -46,27 +46,30 @@ impl Component for Sidebar {
 
 fn sidebar_text(snapshot: &AppSnapshot) -> Text<'static> {
     let mut lines = vec![
-        summary_line("screen", snapshot.screen.title()),
-        summary_line("phase", phase_label(snapshot)),
-        Line::default(),
-        summary_line("github", &snapshot.config.github_username),
-        summary_line("repository", &snapshot.config.repository),
+        summary_line("github", &github_display(&snapshot.config)),
         summary_line("repo path", &snapshot.config.repository_path),
         Line::default(),
+        summary_line("hostname", &snapshot.config.hostname),
+        summary_line("boot loader", snapshot.config.boot_type.label()),
         summary_line("device", &snapshot.config.device),
         summary_line("boot size", &snapshot.config.boot_size),
         summary_line("swap size", &swap_display(&snapshot.config)),
-        summary_line("hostname", &snapshot.config.hostname),
+        summary_line("root", "remaining disk"),
         Line::default(),
         summary_line("keyboard", &snapshot.config.keyboard),
         summary_line("locale", &snapshot.config.locale),
         summary_line("timezone", &snapshot.config.timezone),
-        summary_line("ssh", &snapshot.config.ssh_enabled.to_string()),
         Line::default(),
         summary_line("gpu", &gpu_display(&snapshot.config)),
         summary_line("cpu", &cpu_display(&snapshot.config)),
-        summary_line("boot", snapshot.config.boot_type.label()),
+        summary_line("ssh", &snapshot.config.ssh_enabled.to_string()),
+        summary_line("storage", &snapshot.config.storage_enabled.to_string()),
         summary_line("users", &users_display(&snapshot.config)),
+        summary_line("gui user", &snapshot.config.has_gui_user().to_string()),
+        summary_line(
+            "programming",
+            &snapshot.config.needs_programming_cli().to_string(),
+        ),
     ];
 
     if let Some(pending_user) = snapshot.pending_user.as_ref() {
@@ -91,12 +94,29 @@ fn sidebar_text(snapshot: &AppSnapshot) -> Text<'static> {
     Text::from(lines)
 }
 
-fn phase_label(snapshot: &AppSnapshot) -> &'static str {
-    match snapshot.screen.phase() {
-        crate::app::Phase::PcConfig => "PC Config",
-        crate::app::Phase::Users => "Users",
-        crate::app::Phase::Install => "Install",
+fn github_display(config: &InstallConfig) -> String {
+    if !config.repository_url.trim().is_empty() {
+        trim_git_suffix(config.repository_url.trim()).to_string()
+    } else if looks_like_repo_url(config.repository.trim()) {
+        trim_git_suffix(config.repository.trim()).to_string()
+    } else if config.repository.trim().contains('/') {
+        format!(
+            "https://github.com/{}",
+            trim_git_suffix(config.repository.trim())
+        )
+    } else if !config.github_username.trim().is_empty() {
+        config.github_username.clone()
+    } else {
+        "not selected".to_string()
     }
+}
+
+fn looks_like_repo_url(value: &str) -> bool {
+    value.contains("://") || value.starts_with("git@")
+}
+
+fn trim_git_suffix(value: &str) -> &str {
+    value.strip_suffix(".git").unwrap_or(value)
 }
 
 fn gpu_display(config: &InstallConfig) -> String {
@@ -137,7 +157,12 @@ fn users_display(config: &InstallConfig) -> String {
 }
 
 fn pending_user_display(user: &PendingUser) -> String {
-    format!("{} / {} / {}", user.username, user.display_name, user.user_type.label())
+    format!(
+        "{} / {} / {}",
+        user.username,
+        user.display_name,
+        user.user_type.label()
+    )
 }
 
 fn summary_line(label: &'static str, value: &str) -> Line<'static> {
