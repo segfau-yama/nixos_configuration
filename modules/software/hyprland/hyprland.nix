@@ -1,7 +1,7 @@
 { inputs, ... }:
 {
-  # desktopHyprland (NixOS): Hyprland WM のシステム設定。
-  flake.modules.nixos.desktopHyprland = { pkgs, ... }: {
+  # hyprland (NixOS): Hyprland WM のシステム設定。
+  flake.modules.nixos.hyprland = { pkgs, ... }: {
     hardware.graphics.enable = true;
 
     programs.hyprland = {
@@ -31,8 +31,8 @@
     };
   };
 
-  # desktopHyprland (Home Manager): Hyprland ユーザー設定。
-  flake.modules.homeManager.desktopHyprland = { config, lib, pkgs, ... }:
+  # hyprland (Home Manager): Hyprland ユーザー設定。
+  flake.modules.homeManager.hyprland = { config, lib, pkgs, ... }:
   let
     screenshotRegion = pkgs.writeShellScript "wayshot-region" ''
       ${pkgs.coreutils}/bin/mkdir -p "$HOME/Pictures/Screenshots"

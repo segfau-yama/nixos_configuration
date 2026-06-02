@@ -5,7 +5,7 @@ in
 {
   # jade-office: KDE Plasma とオフィス用途のプリセットユーザー。
   flake.modules.nixos."${username}" = { pkgs, ... }: {
-    imports = [ inputs.self.modules.nixos.desktopPlasma ];
+    imports = [ inputs.self.modules.nixos.plasma ];
 
     my.desktop.plasmaUsers = [ username ];
 
@@ -33,7 +33,7 @@ in
   flake.modules.homeManager."${username}" = { ... }: {
     imports = with inputs.self.modules.homeManager; [
       base
-      desktopPlasma
+      plasma
       browser
       media
       sns

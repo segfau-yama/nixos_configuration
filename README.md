@@ -91,8 +91,8 @@ nixos_configuration/
 | `base` | ブート・NM・Nix GC・stateVersion・unstable overlay・locale・fcitx5・audio・greetd dispatcher |
 | `hardware` | GPU/CPU ドライバー・マイクロコード・nix-auto-storage（`my.hardware.*` オプション） |
 | `home-manager` | Home Manager NixOS 統合 |
-| `desktopHyprland` | Hyprland セッション基盤 |
-| `desktopPlasma` | KDE Plasma セッション基盤 |
+| `hyprland` | Hyprland セッション基盤 |
+| `plasma` | KDE Plasma セッション基盤 |
 | `jade-core` | TUI/CUI ユーザー定義 |
 | `jade-office` | KDE Plasma オフィス用ユーザー定義 |
 | `jade-gaming` | Plasma ゲーム用ユーザー定義 |
@@ -103,8 +103,8 @@ nixos_configuration/
 
 | モジュール名 | 役割 |
 |---|---|
-| `desktopHyprland` | Hyprland config・Hyprpaper・Ironbar・mako |
-| `desktopPlasma` | Plasma ユーザー用 DE フック |
+| `hyprland` | Hyprland config・Hyprpaper・Ironbar・mako |
+| `plasma` | Plasma ユーザー用 DE フック |
 | `base` | zsh・capabilities・nix-index・devenv・nil・nixfmt-rfc-style・ファイル/音量ツール |
 | `programming` | Git・CLI ツール・Rust/Clang/Python・Nushell・Direnv・GUI時のみZed |
 | `browser` | Chromium / w3m |
@@ -115,10 +115,10 @@ nixos_configuration/
 | `electronics` | KiCad |
 | `mechanical` | FreeCAD (Wayland)・MeshLab |
 | `jade-core` | jade-core の HM 設定（base + TUI/CUI ツール） |
-| `jade-office` | jade-office の HM 設定（base + desktopPlasma + office） |
-| `jade-gaming` | jade-gaming の HM 設定（base + desktopPlasma + gaming） |
-| `jade-develop` | jade-develop の HM 設定（base + desktopHyprland + 開発/CAD ツール） |
-| `jade-full` | jade-full の HM 設定（base + desktopHyprland + 全用途ツール） |
+| `jade-office` | jade-office の HM 設定（base + plasma + office） |
+| `jade-gaming` | jade-gaming の HM 設定（base + plasma + gaming） |
+| `jade-develop` | jade-develop の HM 設定（base + hyprland + 開発/CAD ツール） |
+| `jade-full` | jade-full の HM 設定（base + hyprland + 全用途ツール） |
 
 ---
 

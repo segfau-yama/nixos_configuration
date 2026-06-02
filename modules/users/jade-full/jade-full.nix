@@ -5,7 +5,7 @@ in
 {
   # jade-full: Hyprland と全用途パッケージのプリセットユーザー。
   flake.modules.nixos."${username}" = { pkgs, ... }: {
-    imports = [ inputs.self.modules.nixos.desktopHyprland ];
+    imports = [ inputs.self.modules.nixos.hyprland ];
 
     my.desktop.hyprlandUsers = [ username ];
 
@@ -33,7 +33,7 @@ in
   flake.modules.homeManager."${username}" = { ... }: {
     imports = with inputs.self.modules.homeManager; [
       base
-      desktopHyprland
+      hyprland
       programming
       browser
       gaming
