@@ -1040,7 +1040,9 @@ fn run_step<R: CommandRunner>(
 ) -> Result<(), String> {
     emit_log(logs, format!("{label}..."));
     let output = runner
-        .run(program, args)
+        .run_with_log(program, args, &mut |line| {
+            emit_log(logs, format!("{label} output: {line}"));
+        })
         .map_err(|error| format!("{label} failed: {error}"))?;
     if output.exit_code != 0 {
         return Err(format!(
@@ -1048,12 +1050,6 @@ fn run_step<R: CommandRunner>(
             output.exit_code,
             output.stderr.trim()
         ));
-    }
-    if !output.stdout.trim().is_empty() {
-        emit_log(logs, format!("{label} output: {}", output.stdout.trim()));
-    }
-    if !output.stderr.trim().is_empty() {
-        emit_log(logs, format!("{label} stderr: {}", output.stderr.trim()));
     }
     emit_log(logs, format!("{label} done"));
     Ok(())
