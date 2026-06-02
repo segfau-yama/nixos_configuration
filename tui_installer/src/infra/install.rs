@@ -1,6 +1,8 @@
 use std::{
+    cell::RefCell,
     fs,
     path::{Path, PathBuf},
+    sync::mpsc::Sender,
 };
 
 use crate::{
@@ -10,6 +12,10 @@ use crate::{
 
 const MOUNT_ROOT: &str = "/mnt";
 
+thread_local! {
+    static LOG_SENDER: RefCell<Option<Sender<String>>> = const { RefCell::new(None) };
+}
+
 pub fn run_phase3_install(
     config: &InstallConfig,
     users: &[UserConfig],
@@ -17,6 +23,25 @@ pub fn run_phase3_install(
 ) -> Result<(), String> {
     let runner = SystemCommandRunner;
     run_phase3_install_with_runner(config, users, logs, &runner)
+}
+
+pub fn run_phase3_install_streaming(
+    config: &InstallConfig,
+    users: &[UserConfig],
+    log_sender: Sender<String>,
+) -> Result<(), String> {
+    LOG_SENDER.with(|sender| {
+        *sender.borrow_mut() = Some(log_sender);
+    });
+
+    let mut logs = Vec::new();
+    let result = run_phase3_install(config, users, &mut logs);
+
+    LOG_SENDER.with(|sender| {
+        *sender.borrow_mut() = None;
+    });
+
+    result
 }
 
 fn run_phase3_install_with_runner<R: CommandRunner>(
@@ -32,32 +57,41 @@ fn run_phase3_install_with_runner<R: CommandRunner>(
         return Err("No interactive users configured.".to_string());
     }
     validate_install_inputs(config, users)?;
-    logs.push(format!("preflight: target={}", config.device));
-    logs.push("preflight: checking root privileges".to_string());
+    emit_log(logs, format!("preflight: target={}", config.device));
+    emit_log(logs, "preflight: checking root privileges");
     ensure_running_as_root(runner)?;
-    logs.push("preflight: checking target disk mounts".to_string());
+    emit_log(logs, "preflight: checking target disk mounts");
     ensure_target_disk_is_not_mounted(config, logs, runner)?;
-    logs.push("preflight: checks passed".to_string());
+    emit_log(logs, "preflight: checks passed");
 
-    logs.push(format!(
-        "install start: host={}, target={}",
-        config.hostname, config.device
-    ));
-    logs.push(format!(
-        "summary: gpu={}, cpu={}, locale={}, timezone={}",
-        config.gpu_type.label(),
-        config.cpu_type.label(),
-        config.locale,
-        config.timezone
-    ));
-    logs.push(format!(
-        "summary: users={}",
-        users
-            .iter()
-            .map(|user| format!("{}({})", user.username, user.user_type.label()))
-            .collect::<Vec<_>>()
-            .join(", ")
-    ));
+    emit_log(
+        logs,
+        format!(
+            "install start: host={}, target={}",
+            config.hostname, config.device
+        ),
+    );
+    emit_log(
+        logs,
+        format!(
+            "summary: gpu={}, cpu={}, locale={}, timezone={}",
+            config.gpu_type.label(),
+            config.cpu_type.label(),
+            config.locale,
+            config.timezone
+        ),
+    );
+    emit_log(
+        logs,
+        format!(
+            "summary: users={}",
+            users
+                .iter()
+                .map(|user| format!("{}({})", user.username, user.user_type.label()))
+                .collect::<Vec<_>>()
+                .join(", ")
+        ),
+    );
 
     create_partitions(config, logs, runner)?;
     format_filesystems(config, logs, runner)?;
@@ -67,7 +101,7 @@ fn run_phase3_install_with_runner<R: CommandRunner>(
     track_repository(config, logs, runner)?;
     run_nixos_install(config, logs, runner)?;
 
-    logs.push("install complete: phase3 finished".to_string());
+    emit_log(logs, "install complete: phase3 finished");
     Ok(())
 }
 
@@ -188,10 +222,13 @@ fn ensure_target_disk_is_not_mounted<R: CommandRunner>(
         ));
     }
 
-    logs.push(format!(
-        "preflight: unmounting stale installer mounts: {}",
-        format_mounts(&mounted)
-    ));
+    emit_log(
+        logs,
+        format!(
+            "preflight: unmounting stale installer mounts: {}",
+            format_mounts(&mounted)
+        ),
+    );
     let output = runner
         .run("umount", &["-R", MOUNT_ROOT])
         .map_err(|error| format!("preflight: failed to unmount {MOUNT_ROOT}: {error}"))?;
@@ -210,7 +247,7 @@ fn ensure_target_disk_is_not_mounted<R: CommandRunner>(
             format_mounts(&mounted)
         ));
     }
-    logs.push("preflight: stale installer mounts removed".to_string());
+    emit_log(logs, "preflight: stale installer mounts removed");
     Ok(())
 }
 
@@ -482,7 +519,7 @@ fn format_filesystems<R: CommandRunner>(
             &["-L", "swap", &part_swap],
         )?;
     } else {
-        logs.push("format: swap skipped".to_string());
+        emit_log(logs, "format: swap skipped");
     }
     run_step(
         logs,
@@ -532,7 +569,7 @@ fn mount_filesystems<R: CommandRunner>(
             &["/dev/disk/by-label/swap"],
         )?;
     } else {
-        logs.push("mount: swap skipped".to_string());
+        emit_log(logs, "mount: swap skipped");
     }
     Ok(())
 }
@@ -554,10 +591,13 @@ fn prepare_configuration_repository<R: CommandRunner>(
     if source_tree_available(&configured_root) {
         copy_source_tree(&configured_root, Path::new("/mnt/etc/nixos"))
             .map_err(|error| format!("copy source tree failed: {error}"))?;
-        logs.push(format!(
-            "repo: copied selected repository from {}",
-            configured_root.display()
-        ));
+        emit_log(
+            logs,
+            format!(
+                "repo: copied selected repository from {}",
+                configured_root.display()
+            ),
+        );
         return Ok(());
     }
 
@@ -565,10 +605,13 @@ fn prepare_configuration_repository<R: CommandRunner>(
     if source_tree_available(&source_root) {
         copy_source_tree(&source_root, Path::new("/mnt/etc/nixos"))
             .map_err(|error| format!("copy source tree failed: {error}"))?;
-        logs.push(format!(
-            "repo: copied bundled source tree from {}",
-            source_root.display()
-        ));
+        emit_log(
+            logs,
+            format!(
+                "repo: copied bundled source tree from {}",
+                source_root.display()
+            ),
+        );
         return Ok(());
     }
 
@@ -628,10 +671,13 @@ fn generate_hardware_configuration<R: CommandRunner>(
     )?;
     let generated_config = format!("{host_dir}/configuration.nix");
     let _ = fs::remove_file(&generated_config);
-    logs.push("hardware: removed generated configuration.nix".to_string());
+    emit_log(logs, "hardware: removed generated configuration.nix");
     generate_host_module(config, users, Path::new("/mnt/etc/nixos"))?;
-    logs.push(format!("host: generated module for {hostname}"));
-    logs.push(format!("host: applied {} user definition(s)", users.len()));
+    emit_log(logs, format!("host: generated module for {hostname}"));
+    emit_log(
+        logs,
+        format!("host: applied {} user definition(s)", users.len()),
+    );
     Ok(())
 }
 
@@ -948,7 +994,7 @@ fn track_repository<R: CommandRunner>(
             ],
         )?;
     } else {
-        logs.push("git: remote add done".to_string());
+        emit_log(logs, "git: remote add done");
     }
     run_step(
         logs,
@@ -971,9 +1017,9 @@ fn run_nixos_install<R: CommandRunner>(
         runner,
         "install: nixos-install",
         "nixos-install",
-        &["--flake", &flake],
+        &["--flake", &flake, "--no-root-passwd"],
     )?;
-    logs.push("warning: post-install repo sync is not ported yet".to_string());
+    emit_log(logs, "warning: post-install repo sync is not ported yet");
     Ok(())
 }
 
@@ -992,7 +1038,7 @@ fn run_step<R: CommandRunner>(
     program: &str,
     args: &[&str],
 ) -> Result<(), String> {
-    logs.push(format!("{label}..."));
+    emit_log(logs, format!("{label}..."));
     let output = runner
         .run(program, args)
         .map_err(|error| format!("{label} failed: {error}"))?;
@@ -1004,10 +1050,23 @@ fn run_step<R: CommandRunner>(
         ));
     }
     if !output.stdout.trim().is_empty() {
-        logs.push(format!("{label} output: {}", output.stdout.trim()));
+        emit_log(logs, format!("{label} output: {}", output.stdout.trim()));
     }
-    logs.push(format!("{label} done"));
+    if !output.stderr.trim().is_empty() {
+        emit_log(logs, format!("{label} stderr: {}", output.stderr.trim()));
+    }
+    emit_log(logs, format!("{label} done"));
     Ok(())
+}
+
+fn emit_log(logs: &mut Vec<String>, line: impl Into<String>) {
+    let line = line.into();
+    LOG_SENDER.with(|sender| {
+        if let Some(sender) = sender.borrow().as_ref() {
+            let _ = sender.send(line.clone());
+        }
+    });
+    logs.push(line);
 }
 
 fn partition_path(device: &str, index: u8) -> String {
@@ -1199,12 +1258,9 @@ mod tests {
 
         run_nixos_install(&config, &mut logs, &runner).unwrap();
 
-        assert!(
-            runner
-                .calls()
-                .iter()
-                .any(|call| call == "nixos-install --flake path:/mnt/etc/nixos#jadeos")
-        );
+        assert!(runner.calls().iter().any(
+            |call| call == "nixos-install --flake path:/mnt/etc/nixos#jadeos --no-root-passwd"
+        ));
     }
 
     #[test]

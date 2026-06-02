@@ -23,7 +23,7 @@ use crate::{
     },
     event::Event,
     infra::{
-        github::prepare_github_repository, install::run_phase3_install,
+        github::prepare_github_repository, install::run_phase3_install_streaming,
         network::check_network_connectivity, password_hasher::hash_password,
     },
     pages::{InstallerPage, build_pages},
@@ -206,12 +206,8 @@ pub struct App {
     pub devices: Vec<DeviceOption>,
     install_running: bool,
     install_finished: bool,
-    install_receiver: Option<Receiver<InstallOutcome>>,
-}
-
-struct InstallOutcome {
-    logs: Vec<String>,
-    result: std::result::Result<(), String>,
+    install_log_receiver: Option<Receiver<String>>,
+    install_result_receiver: Option<Receiver<std::result::Result<(), String>>>,
 }
 
 impl App {
@@ -244,7 +240,8 @@ impl App {
             devices,
             install_running: false,
             install_finished: false,
-            install_receiver: None,
+            install_log_receiver: None,
+            install_result_receiver: None,
         };
 
         app.header.init()?;
@@ -522,39 +519,70 @@ impl App {
             return;
         }
         if self.install_finished {
-            self.status_message = Some("Installation already finished. Review logs below.".to_string());
+            self.status_message =
+                Some("Installation already finished. Review logs below.".to_string());
             return;
         }
 
         let config = self.config.clone();
         let users = self.config.users.clone();
-        let (sender, receiver) = mpsc::channel();
-        self.install_receiver = Some(receiver);
+        let (log_sender, log_receiver) = mpsc::channel();
+        let (result_sender, result_receiver) = mpsc::channel();
+        self.install_log_receiver = Some(log_receiver);
+        self.install_result_receiver = Some(result_receiver);
         self.install_running = true;
         self.install_log.clear();
-        self.install_log
-            .push("install: background installer started; logs will appear after completion".to_string());
+        self.install_log.push(
+            "install: background installer started; logs will appear after completion".to_string(),
+        );
         self.status_message =
             Some("Installation running. Review the install log modal.".to_string());
 
         thread::spawn(move || {
-            let mut logs = Vec::new();
-            let result = run_phase3_install(&config, &users, &mut logs);
-            let _ = sender.send(InstallOutcome { logs, result });
+            let result = run_phase3_install_streaming(&config, &users, log_sender);
+            let _ = result_sender.send(result);
         });
     }
 
     fn poll_install_worker(&mut self) {
-        let Some(receiver) = self.install_receiver.take() else {
+        self.poll_install_logs();
+        self.poll_install_result();
+    }
+
+    fn poll_install_logs(&mut self) {
+        let Some(receiver) = self.install_log_receiver.take() else {
+            return;
+        };
+
+        let mut keep_receiver = true;
+        loop {
+            match receiver.try_recv() {
+                Ok(line) => {
+                    self.install_log.push(line);
+                }
+                Err(TryRecvError::Empty) => break,
+                Err(TryRecvError::Disconnected) => {
+                    keep_receiver = false;
+                    break;
+                }
+            }
+        }
+
+        if keep_receiver {
+            self.install_log_receiver = Some(receiver);
+        }
+    }
+
+    fn poll_install_result(&mut self) {
+        let Some(receiver) = self.install_result_receiver.take() else {
             return;
         };
 
         match receiver.try_recv() {
-            Ok(outcome) => {
+            Ok(result) => {
                 self.install_running = false;
                 self.install_finished = true;
-                self.install_log = outcome.logs;
-                match outcome.result {
+                match result {
                     Ok(()) => {
                         self.status_message =
                             Some("Installation complete. Review logs below.".to_string());
@@ -566,7 +594,7 @@ impl App {
                 }
             }
             Err(TryRecvError::Empty) => {
-                self.install_receiver = Some(receiver);
+                self.install_result_receiver = Some(receiver);
             }
             Err(TryRecvError::Disconnected) => {
                 self.install_running = false;
