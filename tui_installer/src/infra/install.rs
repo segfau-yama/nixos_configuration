@@ -31,6 +31,7 @@ fn run_phase3_install_with_runner<R: CommandRunner>(
     if users.is_empty() {
         return Err("No interactive users configured.".to_string());
     }
+    validate_install_inputs(config, users)?;
     logs.push(format!("preflight: target={}", config.device));
     logs.push("preflight: checking root privileges".to_string());
     ensure_running_as_root(runner)?;
@@ -62,12 +63,92 @@ fn run_phase3_install_with_runner<R: CommandRunner>(
     format_filesystems(config, logs, runner)?;
     mount_filesystems(config, logs, runner)?;
     prepare_configuration_repository(config, logs, runner)?;
-    generate_hardware_configuration(config, logs, runner)?;
+    generate_hardware_configuration(config, users, logs, runner)?;
     track_repository(config, logs, runner)?;
     run_nixos_install(config, logs, runner)?;
 
     logs.push("install complete: phase3 finished".to_string());
     Ok(())
+}
+
+fn validate_install_inputs(config: &InstallConfig, users: &[UserConfig]) -> Result<(), String> {
+    validate_hostname(&config.hostname)?;
+    validate_hardware_value(
+        "gpu",
+        config.gpu_custom.trim().if_empty(config.gpu_type.label()),
+        &["nvidia", "amd", "intel", "virtio", "none"],
+    )?;
+    validate_hardware_value(
+        "cpu",
+        config.cpu_custom.trim().if_empty(config.cpu_type.label()),
+        &["amd", "intel", "aarch64"],
+    )?;
+
+    for user in users {
+        validate_username(&user.username)?;
+    }
+
+    Ok(())
+}
+
+trait IfEmpty {
+    fn if_empty<'a>(&'a self, fallback: &'a str) -> &'a str;
+}
+
+impl IfEmpty for str {
+    fn if_empty<'a>(&'a self, fallback: &'a str) -> &'a str {
+        if self.is_empty() { fallback } else { self }
+    }
+}
+
+fn validate_hostname(hostname: &str) -> Result<(), String> {
+    let hostname = hostname.trim();
+    if hostname.is_empty() {
+        return Err("Hostname is required.".to_string());
+    }
+    if hostname.len() > 63 {
+        return Err("Hostname must be 63 characters or shorter.".to_string());
+    }
+    if hostname.starts_with('-') || hostname.ends_with('-') {
+        return Err("Hostname must not start or end with '-'.".to_string());
+    }
+    if !hostname
+        .chars()
+        .all(|ch| ch.is_ascii_lowercase() || ch.is_ascii_digit() || ch == '-')
+    {
+        return Err("Hostname must use lowercase letters, numbers, and '-'.".to_string());
+    }
+    Ok(())
+}
+
+fn validate_username(username: &str) -> Result<(), String> {
+    let username = username.trim();
+    let mut chars = username.chars();
+    let Some(first) = chars.next() else {
+        return Err("Username is required.".to_string());
+    };
+    if !(first.is_ascii_lowercase() || first == '_') {
+        return Err(format!(
+            "Username '{username}' must start with a lowercase letter or '_'."
+        ));
+    }
+    if !chars.all(|ch| ch.is_ascii_lowercase() || ch.is_ascii_digit() || ch == '-' || ch == '_') {
+        return Err(format!(
+            "Username '{username}' must use lowercase letters, numbers, '-' or '_'."
+        ));
+    }
+    Ok(())
+}
+
+fn validate_hardware_value(label: &str, value: &str, allowed: &[&str]) -> Result<(), String> {
+    if allowed.contains(&value) {
+        Ok(())
+    } else {
+        Err(format!(
+            "Unsupported {label} value '{value}'. Allowed values: {}.",
+            allowed.join(", ")
+        ))
+    }
 }
 
 fn ensure_running_as_root<R: CommandRunner>(runner: &R) -> Result<(), String> {
@@ -531,10 +612,12 @@ fn prepare_configuration_repository<R: CommandRunner>(
 
 fn generate_hardware_configuration<R: CommandRunner>(
     config: &InstallConfig,
+    users: &[UserConfig],
     logs: &mut Vec<String>,
     runner: &R,
 ) -> Result<(), String> {
-    let host_dir = format!("/mnt/etc/nixos/nixos/{}", config.hostname);
+    let hostname = config.hostname.trim();
+    let host_dir = format!("/mnt/etc/nixos/nixos/{hostname}");
     run_step(logs, runner, "hardware: mkdir", "mkdir", &["-p", &host_dir])?;
     run_step(
         logs,
@@ -546,8 +629,280 @@ fn generate_hardware_configuration<R: CommandRunner>(
     let generated_config = format!("{host_dir}/configuration.nix");
     let _ = fs::remove_file(&generated_config);
     logs.push("hardware: removed generated configuration.nix".to_string());
-    logs.push("warning: host/user module generation is not ported yet".to_string());
+    generate_host_module(config, users, Path::new("/mnt/etc/nixos"))?;
+    logs.push(format!("host: generated module for {hostname}"));
+    logs.push(format!("host: applied {} user definition(s)", users.len()));
     Ok(())
+}
+
+fn generate_host_module(
+    config: &InstallConfig,
+    users: &[UserConfig],
+    repository_root: &Path,
+) -> Result<(), String> {
+    let hostname = config.hostname.trim();
+    let host_module_dir = repository_root.join("modules").join("hosts").join(hostname);
+    fs::create_dir_all(&host_module_dir)
+        .map_err(|error| format!("host: failed to create generated host module dir: {error}"))?;
+
+    fs::write(
+        host_module_dir.join("flake-parts.nix"),
+        host_flake_parts_content(config),
+    )
+    .map_err(|error| format!("host: failed to write generated flake-parts.nix: {error}"))?;
+
+    fs::write(
+        host_module_dir.join(format!("{hostname}.nix")),
+        host_module_content(config, users),
+    )
+    .map_err(|error| format!("host: failed to write generated host module: {error}"))?;
+
+    Ok(())
+}
+
+fn host_flake_parts_content(config: &InstallConfig) -> String {
+    format!(
+        "{{ inputs, ... }}:\n{{\n  flake.nixosConfigurations = inputs.self.lib.mkNixos {} {};\n}}\n",
+        nix_string(nixos_system(config)),
+        nix_string(config.hostname.trim()),
+    )
+}
+
+fn host_module_content(config: &InstallConfig, users: &[UserConfig]) -> String {
+    let hostname = config.hostname.trim();
+    let imports = host_imports(users);
+    let import_lines = imports
+        .iter()
+        .map(|module| format!("      {module}"))
+        .collect::<Vec<_>>()
+        .join("\n");
+    let password_lines = users
+        .iter()
+        .map(user_password_assignment)
+        .collect::<Vec<_>>()
+        .join("");
+    let custom_user_lines = users
+        .iter()
+        .filter(|user| preset_user_module(&user.username).is_none())
+        .map(custom_user_definition)
+        .collect::<Vec<_>>()
+        .join("");
+    let custom_gui_users = users
+        .iter()
+        .filter(|user| {
+            preset_user_module(&user.username).is_none()
+                && user.user_type == crate::config::UserType::Gui
+        })
+        .map(|user| nix_string(user.username.trim()))
+        .collect::<Vec<_>>()
+        .join(" ");
+
+    format!(
+        "{{ inputs, ... }}:\n{{\n  flake.modules.nixos.{} = {{ lib, pkgs, ... }}: {{\n    imports = with inputs.self.modules.nixos; [\n{}\n    ] ++ [ \"${{inputs.self}}/nixos/{}/hardware-configuration.nix\" ];\n\n    networking.hostName = {};\n    time.timeZone = {};\n    i18n.defaultLocale = {};\n    i18n.extraLocaleSettings = {{\n      LC_ADDRESS = {};\n      LC_IDENTIFICATION = {};\n      LC_MEASUREMENT = {};\n      LC_MONETARY = {};\n      LC_NAME = {};\n      LC_NUMERIC = {};\n      LC_PAPER = {};\n      LC_TELEPHONE = {};\n      LC_TIME = {};\n    }};\n    console.keyMap = {};\n\n    my.hardware.gpu = lib.mkDefault {};\n    my.hardware.cpu = lib.mkDefault {};\n    my.hardware.storage.enable = {};\n    my.installDisk = {{\n      boot = {};\n      root = {};\n      swap = {};\n    }};\n\n{}    services.openssh.enable = {};\n{}{}{}  }};\n}}\n",
+        nix_attr(hostname),
+        import_lines,
+        hostname,
+        nix_string(hostname),
+        nix_string(config.timezone.trim()),
+        nix_string(config.locale.trim()),
+        nix_string(config.locale.trim()),
+        nix_string(config.locale.trim()),
+        nix_string(config.locale.trim()),
+        nix_string(config.locale.trim()),
+        nix_string(config.locale.trim()),
+        nix_string(config.locale.trim()),
+        nix_string(config.locale.trim()),
+        nix_string(config.locale.trim()),
+        nix_string(config.keyboard.trim()),
+        nix_string(gpu_value(config)),
+        nix_string(cpu_value(config)),
+        nix_bool(config.storage_enabled),
+        nix_string(boot_partition_device(config)),
+        nix_string("/dev/disk/by-label/nixos"),
+        nix_string(swap_partition_device(config)),
+        boot_loader_content(config),
+        nix_bool(config.ssh_enabled),
+        password_lines,
+        custom_desktop_content(&custom_gui_users),
+        custom_user_lines,
+    )
+}
+
+fn host_imports(users: &[UserConfig]) -> Vec<&'static str> {
+    let mut imports = vec!["base", "home-manager"];
+    if users.iter().any(|user| {
+        preset_user_module(&user.username).is_none()
+            && user.user_type == crate::config::UserType::Gui
+    }) {
+        imports.push("hyprland");
+    }
+    for user in users {
+        if let Some(module) = preset_user_module(&user.username)
+            && !imports.contains(&module)
+        {
+            imports.push(module);
+        }
+    }
+    imports
+}
+
+fn preset_user_module(username: &str) -> Option<&'static str> {
+    match username.trim() {
+        "jade-core" => Some("jade-core"),
+        "jade-office" => Some("jade-office"),
+        "jade-gaming" => Some("jade-gaming"),
+        "jade-develop" => Some("jade-develop"),
+        "jade-full" => Some("jade-full"),
+        _ => None,
+    }
+}
+
+fn custom_desktop_content(custom_gui_users: &str) -> String {
+    if custom_gui_users.is_empty() {
+        String::new()
+    } else {
+        format!("    my.desktop.hyprlandUsers = [ {custom_gui_users} ];\n")
+    }
+}
+
+fn custom_user_definition(user: &UserConfig) -> String {
+    let username = user.username.trim();
+    format!(
+        "\n    users.users.{} = {{\n      isNormalUser = true;\n      description = {};\n      extraGroups = [\n        \"wheel\"\n        \"networkmanager\"\n        \"audio\"\n        \"video\"\n        \"input\"\n        \"seat\"\n      ];\n      shell = pkgs.zsh;\n    }};\n\n    programs.zsh.enable = true;\n\n    home-manager.users.{} = {{\n      imports = with inputs.self.modules.homeManager; [\n{}\n      ];\n\n      my.capabilities = {{\n        user_interface = {};\n        window_manager = {};\n      }};\n\n      home.username = {};\n      home.homeDirectory = {};\n      home.stateVersion = \"25.05\";\n\n      programs.home-manager.enable = true;\n    }};\n",
+        nix_attr(username),
+        nix_string(user.display_name.trim()),
+        nix_attr(username),
+        home_manager_import_lines(user),
+        nix_string(home_user_interface(user)),
+        nix_string(home_window_manager(user)),
+        nix_string(username),
+        nix_string(&format!("/home/{username}")),
+    )
+}
+
+fn user_password_assignment(user: &UserConfig) -> String {
+    format!(
+        "    users.users.{}.hashedPassword = {};\n",
+        nix_attr(user.username.trim()),
+        nix_string(user.password_hash.trim()),
+    )
+}
+
+fn home_manager_import_lines(user: &UserConfig) -> String {
+    custom_home_imports(user)
+        .iter()
+        .map(|module| format!("        {module}"))
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+fn custom_home_imports(user: &UserConfig) -> Vec<&'static str> {
+    let mut imports = vec!["base"];
+    if user.user_type == crate::config::UserType::Gui {
+        imports.push("hyprland");
+    }
+    for program in &user.programs {
+        if let Some(module) = home_manager_module(program)
+            && !imports.contains(&module)
+        {
+            imports.push(module);
+        }
+    }
+    imports
+}
+
+fn home_manager_module(program: &str) -> Option<&'static str> {
+    match program {
+        "browser" => Some("browser"),
+        "office" => Some("office"),
+        "media" => Some("media"),
+        "sns" => Some("sns"),
+        "programming" => Some("programming"),
+        "gaming" => Some("gaming"),
+        "electronics" => Some("electronics"),
+        "mechanical" => Some("mechanical"),
+        _ => None,
+    }
+}
+
+fn home_user_interface(user: &UserConfig) -> &'static str {
+    match user.user_type {
+        crate::config::UserType::Gui => "gui",
+        crate::config::UserType::Tui | crate::config::UserType::Cui => "tui",
+    }
+}
+
+fn home_window_manager(user: &UserConfig) -> &'static str {
+    match user.user_type {
+        crate::config::UserType::Gui => "hyprland",
+        crate::config::UserType::Tui | crate::config::UserType::Cui => "none",
+    }
+}
+
+fn boot_loader_content(config: &InstallConfig) -> String {
+    match config.boot_type {
+        BootType::SystemdBoot => {
+            "    boot.loader.systemd-boot.enable = true;\n    boot.loader.efi.canTouchEfiVariables = true;\n"
+                .to_string()
+        }
+        BootType::Grub => format!(
+            "    boot.loader.grub.enable = true;\n    boot.loader.grub.device = {};\n",
+            nix_string(config.device.trim()),
+        ),
+    }
+}
+
+fn boot_partition_device(config: &InstallConfig) -> &'static str {
+    match config.boot_type {
+        BootType::SystemdBoot => "/dev/disk/by-label/boot",
+        BootType::Grub => "",
+    }
+}
+
+fn swap_partition_device(config: &InstallConfig) -> &'static str {
+    if config.has_swap_partition() {
+        "/dev/disk/by-label/swap"
+    } else {
+        ""
+    }
+}
+
+fn gpu_value(config: &InstallConfig) -> &str {
+    config.gpu_custom.trim().if_empty(config.gpu_type.label())
+}
+
+fn cpu_value(config: &InstallConfig) -> &str {
+    config.cpu_custom.trim().if_empty(config.cpu_type.label())
+}
+
+fn nixos_system(config: &InstallConfig) -> &'static str {
+    if cpu_value(config) == "aarch64" {
+        "aarch64-linux"
+    } else {
+        "x86_64-linux"
+    }
+}
+
+fn nix_bool(value: bool) -> &'static str {
+    if value { "true" } else { "false" }
+}
+
+fn nix_attr(value: &str) -> String {
+    nix_string(value)
+}
+
+fn nix_string(value: &str) -> String {
+    format!("\"{}\"", escape_nix_string(value))
+}
+
+fn escape_nix_string(value: &str) -> String {
+    value
+        .replace('\\', "\\\\")
+        .replace('"', "\\\"")
+        .replace('\n', "\\n")
+        .replace('\r', "\\r")
+        .replace('\t', "\\t")
+        .replace("${", "\\${")
 }
 
 fn track_repository<R: CommandRunner>(
@@ -608,7 +963,7 @@ fn run_nixos_install<R: CommandRunner>(
     logs: &mut Vec<String>,
     runner: &R,
 ) -> Result<(), String> {
-    let flake = format!("/mnt/etc/nixos#{}", config.hostname);
+    let flake = format!("path:/mnt/etc/nixos#{}", config.hostname.trim());
     run_step(
         logs,
         runner,
