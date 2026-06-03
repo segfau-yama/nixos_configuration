@@ -218,6 +218,11 @@ fn resolve_repository<R: CommandRunner>(
         return normalize_repository("", &input);
     }
 
+    let configured_username = config.github_username.trim().to_string();
+    if !configured_username.is_empty() {
+        return normalize_repository(&configured_username, &input);
+    }
+
     let username = github_username(runner)?;
     config.github_username = username.clone();
     normalize_repository(&username, &input)
@@ -345,6 +350,29 @@ mod tests {
         }));
         assert!(!runner.calls().iter().any(|call| call.starts_with("gh ")));
         assert_eq!(config.github_username, "");
+    }
+
+    #[test]
+    fn prepare_github_repository_uses_configured_username_for_repo_name_without_gh() {
+        let runner = RecordingRunner::default();
+        let mut config = InstallConfig {
+            github_username: "suichan".to_string(),
+            repository: "nixos_configuration".to_string(),
+            repository_path: format!(
+                "{}/jadeos_setting_tui_missing_repo_name_for_test",
+                std::env::temp_dir().display()
+            ),
+            ..InstallConfig::default()
+        };
+        let mut logs = Vec::new();
+
+        let result = prepare_github_repository_with_runner(&mut config, &mut logs, &runner);
+
+        assert!(result.is_err());
+        assert!(runner.calls().iter().any(|call| {
+            call.starts_with("git clone https://github.com/suichan/nixos_configuration.git ")
+        }));
+        assert!(!runner.calls().iter().any(|call| call.starts_with("gh ")));
     }
 
     #[test]

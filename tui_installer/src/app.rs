@@ -10,7 +10,7 @@ use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span, Text},
-    widgets::{Block, Borders, Paragraph, Wrap},
+    widgets::{Block, Borders, Clear, Paragraph, Wrap},
 };
 
 use crate::{
@@ -189,6 +189,7 @@ pub struct AppSnapshot {
     pub install_log: Vec<String>,
     pub install_running: bool,
     pub install_finished: bool,
+    pub repository_prepare_running: bool,
 }
 
 pub struct App {
@@ -208,6 +209,14 @@ pub struct App {
     install_finished: bool,
     install_log_receiver: Option<Receiver<String>>,
     install_result_receiver: Option<Receiver<std::result::Result<(), String>>>,
+    repository_prepare_running: bool,
+    repository_prepare_receiver: Option<Receiver<RepositoryPrepareOutcome>>,
+}
+
+struct RepositoryPrepareOutcome {
+    config: InstallConfig,
+    logs: Vec<String>,
+    result: std::result::Result<(), String>,
 }
 
 impl App {
@@ -242,6 +251,8 @@ impl App {
             install_finished: false,
             install_log_receiver: None,
             install_result_receiver: None,
+            repository_prepare_running: false,
+            repository_prepare_receiver: None,
         };
 
         app.header.init()?;
@@ -252,6 +263,7 @@ impl App {
     }
 
     pub fn handle_event(&mut self, event: Option<Event>) -> Action {
+        self.poll_repository_prepare_worker();
         self.poll_install_worker();
         self.sync_components();
         self.pages
@@ -266,6 +278,7 @@ impl App {
 
     pub fn render(&mut self, frame: &mut Frame) {
         self.sync_components();
+        frame.render_widget(Clear, frame.area());
 
         let layout = Layout::default()
             .direction(Direction::Vertical)
@@ -475,6 +488,7 @@ impl App {
             install_log: self.install_log.clone(),
             install_running: self.install_running,
             install_finished: self.install_finished,
+            repository_prepare_running: self.repository_prepare_running,
         }
     }
 
@@ -499,17 +513,56 @@ impl App {
     }
 
     fn prepare_repository(&mut self) {
-        let mut logs = Vec::new();
-        match prepare_github_repository(&mut self.config, &mut logs) {
-            Ok(()) => {
-                self.install_log.extend(logs);
-                self.status_message =
-                    Some(format!("Repository ready: {}", self.config.repository_path));
-                self.current_screen = Screen::DeviceSelect;
+        if self.repository_prepare_running {
+            self.status_message = Some("Repository preparation is already running.".to_string());
+            return;
+        }
+
+        let mut config = self.config.clone();
+        let (sender, receiver) = mpsc::channel();
+        self.repository_prepare_receiver = Some(receiver);
+        self.repository_prepare_running = true;
+        self.status_message = Some("Preparing repository...".to_string());
+
+        thread::spawn(move || {
+            let mut logs = Vec::new();
+            let result = prepare_github_repository(&mut config, &mut logs);
+            let _ = sender.send(RepositoryPrepareOutcome {
+                config,
+                logs,
+                result,
+            });
+        });
+    }
+
+    fn poll_repository_prepare_worker(&mut self) {
+        let Some(receiver) = self.repository_prepare_receiver.take() else {
+            return;
+        };
+
+        match receiver.try_recv() {
+            Ok(outcome) => {
+                self.repository_prepare_running = false;
+                self.install_log.extend(outcome.logs);
+                match outcome.result {
+                    Ok(()) => {
+                        self.config = outcome.config;
+                        self.status_message =
+                            Some(format!("Repository ready: {}", self.config.repository_path));
+                        self.current_screen = Screen::DeviceSelect;
+                    }
+                    Err(error) => {
+                        self.status_message = Some(error);
+                    }
+                }
             }
-            Err(error) => {
-                self.install_log.extend(logs);
-                self.status_message = Some(error);
+            Err(TryRecvError::Empty) => {
+                self.repository_prepare_receiver = Some(receiver);
+            }
+            Err(TryRecvError::Disconnected) => {
+                self.repository_prepare_running = false;
+                self.status_message =
+                    Some("Repository preparation failed: worker disconnected".to_string());
             }
         }
     }

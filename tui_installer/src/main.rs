@@ -37,6 +37,9 @@ fn run(terminal: &mut TuiTerminal) -> Result<()> {
     let mut app = App::new()?;
     let mut events = EventHandler::new(Duration::from_millis(250));
 
+    terminal.clear()?;
+    terminal.draw(|frame| app.render(frame))?;
+
     while !app.should_quit {
         let event = events.next()?;
         let action = app.handle_event(event);

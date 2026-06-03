@@ -19,6 +19,7 @@ pub struct GitHubLoginPage {
     github_username: String,
     repository: String,
     repository_path: String,
+    repository_prepare_running: bool,
     status_message: Option<String>,
 }
 
@@ -35,12 +36,21 @@ impl InstallerPage for GitHubLoginPage {
         self.github_username = snapshot.config.github_username.clone();
         self.repository = snapshot.config.repository.clone();
         self.repository_path = snapshot.config.repository_path.clone();
-        self.status_message = snapshot.status_message.clone();
+        self.repository_prepare_running = snapshot.repository_prepare_running;
+        self.status_message = if self.repository_prepare_running {
+            Some("Preparing repository...".to_string())
+        } else {
+            snapshot.status_message.clone()
+        };
     }
 }
 
 impl Component for GitHubLoginPage {
     fn handle_key_events(&mut self, key: KeyEvent) -> Action {
+        if self.repository_prepare_running {
+            return Action::SetStatus(Some("Preparing repository...".to_string()));
+        }
+
         if self.editing {
             match key.code {
                 KeyCode::Esc | KeyCode::Enter => {
