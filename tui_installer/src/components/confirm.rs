@@ -32,13 +32,9 @@ impl ConfirmChoice {
     pub fn field(&self, label: impl Into<String>, hint: impl Into<String>) -> FormField {
         FormField::new(
             label,
-            if self.selected_yes {
-                "[ yes ] / no"
-            } else {
-                "yes / [ no ]"
-            },
+            if self.selected_yes { "yes" } else { "no" },
             Some(hint),
-            FormFieldRole::Choice,
+            FormFieldRole::ButtonGroup,
         )
     }
 }

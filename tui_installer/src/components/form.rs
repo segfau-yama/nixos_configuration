@@ -59,6 +59,7 @@ impl FormField {
 pub enum FormFieldRole {
     Text,
     Choice,
+    ButtonGroup,
     Toggle,
     Log,
     ReadOnly,
@@ -177,19 +178,22 @@ fn render_field(
 
     let value = display_value(&field.value);
     let cursor_offset = field.value.chars().count() as u16;
-    let paragraph = if field.role == FormFieldRole::Log {
-        Paragraph::new(value.clone())
+    let paragraph = match field.role {
+        FormFieldRole::Log => Paragraph::new(value.clone())
             .style(value_style(&value, field.role, is_active))
             .wrap(Wrap { trim: false })
-            .block(block)
-    } else {
-        Paragraph::new(Line::from(Span::styled(
+            .block(block),
+        FormFieldRole::ButtonGroup => Paragraph::new(button_group_line(&value))
+            .style(Style::default().fg(Color::Gray))
+            .wrap(Wrap { trim: false })
+            .block(block),
+        _ => Paragraph::new(Line::from(Span::styled(
             value.clone(),
             value_style(&value, field.role, is_active),
         )))
         .style(Style::default().fg(Color::Gray))
         .wrap(Wrap { trim: false })
-        .block(block)
+        .block(block),
     };
     frame.render_widget(paragraph, layout[0]);
 
@@ -215,6 +219,7 @@ fn field_title(field: &FormField, is_active: bool, text_editing: bool) -> Line<'
     let role = match field.role {
         FormFieldRole::Text => "input",
         FormFieldRole::Choice => "choice",
+        FormFieldRole::ButtonGroup => "choice",
         FormFieldRole::Toggle => "toggle",
         FormFieldRole::Log => "log",
         FormFieldRole::ReadOnly => "info",
@@ -264,6 +269,7 @@ fn border_style(role: FormFieldRole, is_active: bool) -> Style {
     let color = match role {
         FormFieldRole::Text => Color::Blue,
         FormFieldRole::Choice => Color::Cyan,
+        FormFieldRole::ButtonGroup => Color::Cyan,
         FormFieldRole::Toggle => Color::Magenta,
         FormFieldRole::Log => Color::Green,
         FormFieldRole::ReadOnly => Color::DarkGray,
@@ -306,6 +312,7 @@ fn value_style(value: &str, role: FormFieldRole, is_active: bool) -> Style {
         (FormFieldRole::Choice, "custom") => Style::default()
             .fg(Color::Yellow)
             .add_modifier(Modifier::BOLD),
+        (FormFieldRole::ButtonGroup, _) => Style::default().fg(Color::Cyan),
         (FormFieldRole::Log, _) => Style::default().fg(Color::Gray),
         (FormFieldRole::ReadOnly, _) => Style::default().fg(Color::Gray),
         _ => Style::default().fg(Color::Cyan),
@@ -315,6 +322,34 @@ fn value_style(value: &str, role: FormFieldRole, is_active: bool) -> Style {
         base.add_modifier(Modifier::BOLD | Modifier::UNDERLINED | Modifier::REVERSED)
     } else {
         base
+    }
+}
+
+fn button_group_line(value: &str) -> Line<'static> {
+    let selected_yes = value == "yes";
+    Line::from(vec![
+        button_span(" YES ", selected_yes),
+        Span::raw("   "),
+        button_span(" NO ", !selected_yes),
+    ])
+}
+
+fn button_span(label: &'static str, selected: bool) -> Span<'static> {
+    if selected {
+        Span::styled(
+            format!("[{label}]"),
+            Style::default()
+                .fg(Color::Black)
+                .bg(Color::Yellow)
+                .add_modifier(Modifier::BOLD),
+        )
+    } else {
+        Span::styled(
+            format!("[{label}]"),
+            Style::default()
+                .fg(Color::Cyan)
+                .add_modifier(Modifier::BOLD),
+        )
     }
 }
 
