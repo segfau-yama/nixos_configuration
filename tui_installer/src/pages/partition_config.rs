@@ -8,7 +8,7 @@ use crate::{
     app::{AppSnapshot, Screen},
     component::Component,
     components::{
-        Popup,
+        ConfirmChoice, ConfirmChoiceAction, Popup,
         form::{FormFieldRole, FormSection, render_form_section},
     },
     pages::{InstallerPage, form_field, status_field},
@@ -29,8 +29,7 @@ pub struct PartitionConfirmPage {
     device: String,
     boot_size: String,
     swap_size: String,
-    confirmation: String,
-    editing: bool,
+    confirmation: ConfirmChoice,
     status_message: Option<String>,
 }
 
@@ -157,17 +156,15 @@ impl InstallerPage for PartitionConfirmPage {
         Some(Popup::new(
             "Partition Confirm",
             72,
-            36,
+            30,
             FormSection::new(
                 "partition confirmation",
-                vec![form_field(
-                    "confirmation",
-                    self.confirmation.clone(),
-                    Some("Type yes to confirm destructive partitioning".to_string()),
-                    FormFieldRole::Text,
+                vec![self.confirmation.field(
+                    "repartition disk",
+                    "Choose yes to continue; no cancels destructive partitioning",
                 )],
                 Some(0),
-                self.editing,
+                false,
             ),
         ))
     }
@@ -175,41 +172,16 @@ impl InstallerPage for PartitionConfirmPage {
 
 impl Component for PartitionConfirmPage {
     fn handle_key_events(&mut self, key: KeyEvent) -> Action {
-        if self.editing {
-            match key.code {
-                KeyCode::Esc | KeyCode::Enter => {
-                    self.editing = false;
-                    Action::Noop
-                }
-                KeyCode::Backspace => {
-                    self.confirmation.pop();
-                    Action::Noop
-                }
-                KeyCode::Char(c) => {
-                    self.confirmation.push(c);
-                    Action::Noop
-                }
-                _ => Action::Noop,
+        if key.code == KeyCode::Char('q') {
+            return Action::Quit;
+        }
+
+        match self.confirmation.handle_key(key) {
+            ConfirmChoiceAction::Submit(true) => Action::Navigate(Screen::HostSelect),
+            ConfirmChoiceAction::Submit(false) | ConfirmChoiceAction::Cancel => {
+                Action::Navigate(Screen::PartitionConfig)
             }
-        } else {
-            match key.code {
-                KeyCode::Char('q') => Action::Quit,
-                KeyCode::Left | KeyCode::Esc => Action::Navigate(Screen::PartitionConfig),
-                KeyCode::Enter => {
-                    self.editing = true;
-                    Action::Noop
-                }
-                KeyCode::Right => {
-                    if self.confirmation.trim() == "yes" {
-                        Action::Navigate(Screen::HostSelect)
-                    } else {
-                        Action::SetStatus(Some(
-                            "Type 'yes' in confirm field before continuing".to_string(),
-                        ))
-                    }
-                }
-                _ => Action::Noop,
-            }
+            ConfirmChoiceAction::Noop => Action::Noop,
         }
     }
 

@@ -386,21 +386,17 @@ impl Component for CustomTypePage {
     }
 
     fn render(&mut self, f: &mut Frame, rect: Rect) {
-        let options = ["gui", "tui", "cui"];
-        let mut fields = options
-            .iter()
-            .map(|option| {
-                form_field(
-                    "user type",
-                    *option,
-                    Some("Select the default experience for this user".to_string()),
-                    FormFieldRole::Choice,
-                )
-            })
-            .collect::<Vec<_>>();
-        fields.push(status_field(self.status_message.as_deref()));
+        let fields = vec![
+            form_field(
+                "user type",
+                user_type_choice_value(self.selected),
+                Some("Select the default experience for this user".to_string()),
+                FormFieldRole::Choice,
+            ),
+            status_field(self.status_message.as_deref()),
+        ];
 
-        let section = FormSection::new("user type", fields, Some(self.selected), false);
+        let section = FormSection::new("user type", fields, Some(0), false);
         render_form_section(f, rect, &section);
     }
 }
@@ -719,9 +715,32 @@ fn user_menu_hint(index: usize) -> &'static str {
     }
 }
 
+fn user_type_choice_value(selected: usize) -> String {
+    ["gui", "tui", "cui"]
+        .iter()
+        .enumerate()
+        .map(|(index, option)| {
+            if index == selected {
+                format!("[ {option} ]")
+            } else {
+                (*option).to_string()
+            }
+        })
+        .collect::<Vec<_>>()
+        .join(" / ")
+}
+
 fn program_options_for(user_type: UserType) -> &'static [&'static str] {
     match user_type {
-        UserType::Gui => &["browser", "office", "media", "sns", "programming", "gaming"],
+        UserType::Gui => &[
+            "browser",
+            "office",
+            "media",
+            "sns",
+            "programming",
+            "gaming",
+            "electronics",
+        ],
         UserType::Tui => &["cli-tools", "git", "programming", "media"],
         UserType::Cui => &["base", "monitoring", "networking"],
     }

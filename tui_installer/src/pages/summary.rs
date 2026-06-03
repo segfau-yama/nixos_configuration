@@ -8,7 +8,7 @@ use crate::{
     app::{AppSnapshot, Screen},
     component::Component,
     components::{
-        Popup,
+        ConfirmChoice, ConfirmChoiceAction, Popup,
         form::{FormFieldRole, FormSection, render_form_section},
     },
     config::InstallConfig,
@@ -19,6 +19,7 @@ use crate::{
 #[derive(Default)]
 pub struct SummaryPage {
     config: InstallConfig,
+    confirmation: ConfirmChoice,
     status_message: Option<String>,
 }
 
@@ -42,12 +43,10 @@ impl InstallerPage for SummaryPage {
             72,
             30,
             FormSection::new(
-                "install",
-                vec![form_field(
+                "install confirmation",
+                vec![self.confirmation.field(
                     "start install",
-                    "ready",
-                    Some("Press Enter or Right to open the install log and start".to_string()),
-                    FormFieldRole::Choice,
+                    "Choose yes to open the install log and start",
                 )],
                 Some(0),
                 false,
@@ -58,11 +57,16 @@ impl InstallerPage for SummaryPage {
 
 impl Component for SummaryPage {
     fn handle_key_events(&mut self, key: KeyEvent) -> Action {
-        match key.code {
-            KeyCode::Char('q') => Action::Quit,
-            KeyCode::Left | KeyCode::Esc => Action::Navigate(Screen::UserMenu),
-            KeyCode::Right | KeyCode::Enter => Action::Navigate(Screen::Done),
-            _ => Action::Noop,
+        if key.code == KeyCode::Char('q') {
+            return Action::Quit;
+        }
+
+        match self.confirmation.handle_key(key) {
+            ConfirmChoiceAction::Submit(true) => Action::Navigate(Screen::Done),
+            ConfirmChoiceAction::Submit(false) | ConfirmChoiceAction::Cancel => {
+                Action::Navigate(Screen::UserMenu)
+            }
+            ConfirmChoiceAction::Noop => Action::Noop,
         }
     }
 
