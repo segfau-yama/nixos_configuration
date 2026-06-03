@@ -294,6 +294,15 @@ fn value_style(value: &str, role: FormFieldRole, is_active: bool) -> Style {
     let base = match (role, value) {
         (FormFieldRole::Toggle, "true") => Style::default().fg(Color::Green),
         (FormFieldRole::Toggle, "false") => Style::default().fg(Color::Red),
+        (FormFieldRole::ReadOnly, value) if value.starts_with("SUCCESS") => Style::default()
+            .fg(Color::Green)
+            .add_modifier(Modifier::BOLD),
+        (FormFieldRole::ReadOnly, value) if value.starts_with("FAILED") => {
+            Style::default().fg(Color::Red).add_modifier(Modifier::BOLD)
+        }
+        (FormFieldRole::ReadOnly, value) if value.starts_with("RUNNING") => Style::default()
+            .fg(Color::Yellow)
+            .add_modifier(Modifier::BOLD),
         (FormFieldRole::Choice, "custom") => Style::default()
             .fg(Color::Yellow)
             .add_modifier(Modifier::BOLD),

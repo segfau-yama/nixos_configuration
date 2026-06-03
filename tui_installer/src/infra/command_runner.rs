@@ -27,7 +27,7 @@ pub trait CommandRunner {
             on_line(line.to_string());
         }
         for line in output.stderr.lines() {
-            on_line(format!("stderr: {line}"));
+            on_line(line.to_string());
         }
         Ok(output)
     }
@@ -126,7 +126,7 @@ fn collect_stream_line(
             stderr.push('\n');
         }
         stderr.push_str(&line.content);
-        on_line(format!("stderr: {}", line.content));
+        on_line(line.content);
     } else {
         if !stdout.is_empty() {
             stdout.push('\n');

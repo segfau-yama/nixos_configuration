@@ -41,11 +41,19 @@ impl InstallerPage for DonePage {
 
     fn popup(&self) -> Option<Popup> {
         Some(Popup::new(
-            "Install Log",
+            popup_title(
+                self.install_running,
+                self.install_finished,
+                self.status_message.as_deref(),
+            ),
             88,
             76,
             FormSection::new(
-                "install log",
+                section_title(
+                    self.install_running,
+                    self.install_finished,
+                    self.status_message.as_deref(),
+                ),
                 vec![
                     form_field(
                         "result",
@@ -125,15 +133,15 @@ fn result_display(
     log_is_empty: bool,
 ) -> &'static str {
     if install_running {
-        return "installation running";
+        return "RUNNING - installation in progress";
     }
 
     match status_message {
         Some(message) if message.contains("failed") || message.contains("Failed") => {
-            "installation failed"
+            "FAILED - installation did not complete"
         }
-        Some(_) => "installation complete",
-        None if install_finished => "installation finished",
+        Some(_) => "SUCCESS - installation complete",
+        None if install_finished => "SUCCESS - installation finished",
         None if log_is_empty => "installation pending",
         None => "installation finished",
     }
@@ -153,8 +161,48 @@ fn log_display(install_log: &[String], install_running: bool) -> String {
 
 fn done_hint(install_running: bool) -> &'static str {
     if install_running {
-        "Install is running; completion logs will appear here"
+        "Install is running; live logs appear below"
     } else {
-        "Left returns to Summary, q quits"
+        "Review logs, then reboot or press q to quit"
     }
+}
+
+fn popup_title(
+    install_running: bool,
+    install_finished: bool,
+    status_message: Option<&str>,
+) -> &'static str {
+    if install_running {
+        return "Install Running";
+    }
+    if status_message
+        .map(|message| message.contains("failed") || message.contains("Failed"))
+        .unwrap_or(false)
+    {
+        return "Install Failed";
+    }
+    if install_finished {
+        return "Install Complete";
+    }
+    "Install Log"
+}
+
+fn section_title(
+    install_running: bool,
+    install_finished: bool,
+    status_message: Option<&str>,
+) -> &'static str {
+    if install_running {
+        return "install running";
+    }
+    if status_message
+        .map(|message| message.contains("failed") || message.contains("Failed"))
+        .unwrap_or(false)
+    {
+        return "install failed";
+    }
+    if install_finished {
+        return "install complete";
+    }
+    "install log"
 }

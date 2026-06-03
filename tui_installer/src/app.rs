@@ -532,9 +532,8 @@ impl App {
         self.install_result_receiver = Some(result_receiver);
         self.install_running = true;
         self.install_log.clear();
-        self.install_log.push(
-            "install: background installer started; logs will appear after completion".to_string(),
-        );
+        self.install_log
+            .push("install: background installer started; live logs will appear below".to_string());
         self.status_message =
             Some("Installation running. Review the install log modal.".to_string());
 
@@ -584,8 +583,12 @@ impl App {
                 self.install_finished = true;
                 match result {
                     Ok(()) => {
+                        self.install_log.push(
+                            "install: SUCCESS - installation complete. Reboot after reviewing logs."
+                                .to_string(),
+                        );
                         self.status_message =
-                            Some("Installation complete. Review logs below.".to_string());
+                            Some("Installation complete. Reboot after reviewing logs.".to_string());
                     }
                     Err(error) => {
                         self.install_log.push(format!("install failed: {error}"));

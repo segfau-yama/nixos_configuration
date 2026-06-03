@@ -19,8 +19,6 @@ use crate::{
 #[derive(Default)]
 pub struct SummaryPage {
     config: InstallConfig,
-    confirmation: String,
-    editing: bool,
     status_message: Option<String>,
 }
 
@@ -42,20 +40,17 @@ impl InstallerPage for SummaryPage {
         Some(Popup::new(
             "Summary",
             72,
-            36,
+            30,
             FormSection::new(
-                "install confirmation",
+                "install",
                 vec![form_field(
-                    "confirmation",
-                    self.confirmation.clone(),
-                    Some(
-                        "Type yes, stop editing, then press Right to open the install log"
-                            .to_string(),
-                    ),
-                    FormFieldRole::Text,
+                    "start install",
+                    "ready",
+                    Some("Press Enter or Right to open the install log and start".to_string()),
+                    FormFieldRole::Choice,
                 )],
                 Some(0),
-                self.editing,
+                false,
             ),
         ))
     }
@@ -63,41 +58,11 @@ impl InstallerPage for SummaryPage {
 
 impl Component for SummaryPage {
     fn handle_key_events(&mut self, key: KeyEvent) -> Action {
-        if self.editing {
-            match key.code {
-                KeyCode::Esc | KeyCode::Enter => {
-                    self.editing = false;
-                    Action::Noop
-                }
-                KeyCode::Backspace => {
-                    self.confirmation.pop();
-                    Action::Noop
-                }
-                KeyCode::Char(c) => {
-                    self.confirmation.push(c);
-                    Action::Noop
-                }
-                _ => Action::Noop,
-            }
-        } else {
-            match key.code {
-                KeyCode::Char('q') => Action::Quit,
-                KeyCode::Left => Action::Navigate(Screen::UserMenu),
-                KeyCode::Enter => {
-                    self.editing = true;
-                    Action::Noop
-                }
-                KeyCode::Right => {
-                    if self.confirmation.trim() == "yes" {
-                        Action::Navigate(Screen::Done)
-                    } else {
-                        Action::SetStatus(Some(
-                            "Type 'yes' before opening the install log".to_string(),
-                        ))
-                    }
-                }
-                _ => Action::Noop,
-            }
+        match key.code {
+            KeyCode::Char('q') => Action::Quit,
+            KeyCode::Left | KeyCode::Esc => Action::Navigate(Screen::UserMenu),
+            KeyCode::Right | KeyCode::Enter => Action::Navigate(Screen::Done),
+            _ => Action::Noop,
         }
     }
 
