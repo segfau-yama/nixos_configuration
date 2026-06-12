@@ -38,7 +38,7 @@ Environment/configuration:
 This script:
   1. Checks network connectivity.
   2. Clones/copies the configuration repository.
-  3. Selects an install profile from modules/hosts.
+  3. Selects an install profile from nixos/.
   4. Selects a target disk and partition sizes.
   5. Confirms destructive partition/format operations.
   6. Writes nixos/<profile>/install-args.nix and generated hardware config.
@@ -98,7 +98,7 @@ prompt_default() {
 
 is_repo_root() {
   local path="$1"
-  [[ -f "$path/flake.nix" && -d "$path/modules/hosts" ]]
+  [[ -f "$path/flake.nix" && -d "$path/nixos" ]]
 }
 
 check_network() {
@@ -180,11 +180,11 @@ discover_profiles() {
   while IFS= read -r host_dir; do
     profile="$(basename "$host_dir")"
     [[ -n "$profile" ]] || continue
-    [[ "$profile" == ".gitkeep" ]] && continue
+    [[ -f "$host_dir/flake-parts.nix" ]] || continue
     out_profiles+=("$profile")
-  done < <(find "$SOURCE_REPO/modules/hosts" -mindepth 1 -maxdepth 1 -type d | sort)
+  done < <(find "$SOURCE_REPO/nixos" -mindepth 1 -maxdepth 1 -type d | sort)
 
-  ((${#out_profiles[@]} > 0)) || error "No valid hosts found in $SOURCE_REPO/modules/hosts"
+  ((${#out_profiles[@]} > 0)) || error "No valid hosts found in $SOURCE_REPO/nixos"
 }
 
 select_profile() {

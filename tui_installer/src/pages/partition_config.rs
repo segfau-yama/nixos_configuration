@@ -106,7 +106,7 @@ impl Component for PartitionConfigPage {
                 form_field(
                     "boot size",
                     self.boot_size.clone(),
-                    Some("Default: 512MiB".to_string()),
+                    Some("Default: 2GiB".to_string()),
                     FormFieldRole::Text,
                 ),
                 form_field(

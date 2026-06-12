@@ -660,20 +660,37 @@ fn generate_hardware_configuration<R: CommandRunner>(
     runner: &R,
 ) -> Result<(), String> {
     let hostname = config.hostname.trim();
-    let host_dir = format!("/mnt/etc/nixos/nixos/{hostname}");
-    run_step(logs, runner, "hardware: mkdir", "mkdir", &["-p", &host_dir])?;
+    let host_dir = Path::new("/mnt/etc/nixos").join("nixos").join(hostname);
     run_step(
         logs,
         runner,
-        "hardware: nixos-generate-config",
-        "nixos-generate-config",
-        &["--root", MOUNT_ROOT, "--dir", &host_dir],
+        "host: mkdir",
+        "mkdir",
+        &["-p", host_dir.to_str().unwrap_or("/mnt/etc/nixos/nixos")],
     )?;
-    let generated_config = format!("{host_dir}/configuration.nix");
-    let _ = fs::remove_file(&generated_config);
-    emit_log(logs, "hardware: removed generated configuration.nix");
+    emit_log(logs, "hardware: nixos-generate-config...");
+    let output = runner
+        .run_with_log(
+            "nixos-generate-config",
+            &["--root", MOUNT_ROOT, "--show-hardware-config"],
+            &mut |line| emit_log(logs, format!("hardware: nixos-generate-config output: {line}")),
+        )
+        .map_err(|error| format!("hardware: nixos-generate-config failed: {error}"))?;
+    if output.exit_code != 0 {
+        return Err(format!(
+            "hardware: nixos-generate-config failed with exit code {}: {}",
+            output.exit_code,
+            output.stderr.trim()
+        ));
+    }
+    fs::write(
+        host_dir.join("generated-hardware-configuration.nix"),
+        output.stdout,
+    )
+    .map_err(|error| format!("hardware: failed to write generated hardware config: {error}"))?;
+    emit_log(logs, "hardware: wrote generated-hardware-configuration.nix");
     generate_host_module(config, users, Path::new("/mnt/etc/nixos"))?;
-    emit_log(logs, format!("host: generated module for {hostname}"));
+    emit_log(logs, format!("host: generated configuration for {hostname}"));
     emit_log(
         logs,
         format!("host: applied {} user definition(s)", users.len()),
@@ -687,9 +704,9 @@ fn generate_host_module(
     repository_root: &Path,
 ) -> Result<(), String> {
     let hostname = config.hostname.trim();
-    let host_module_dir = repository_root.join("modules").join("hosts").join(hostname);
+    let host_module_dir = repository_root.join("nixos").join(hostname);
     fs::create_dir_all(&host_module_dir)
-        .map_err(|error| format!("host: failed to create generated host module dir: {error}"))?;
+        .map_err(|error| format!("host: failed to create generated host directory: {error}"))?;
 
     fs::write(
         host_module_dir.join("flake-parts.nix"),
@@ -698,10 +715,16 @@ fn generate_host_module(
     .map_err(|error| format!("host: failed to write generated flake-parts.nix: {error}"))?;
 
     fs::write(
-        host_module_dir.join(format!("{hostname}.nix")),
+        host_module_dir.join("configuration.nix"),
         host_module_content(config, users),
     )
-    .map_err(|error| format!("host: failed to write generated host module: {error}"))?;
+    .map_err(|error| format!("host: failed to write generated configuration.nix: {error}"))?;
+
+    fs::write(
+        host_module_dir.join("hardware-configuration.nix"),
+        hardware_configuration_content(config),
+    )
+    .map_err(|error| format!("host: failed to write hardware-configuration.nix: {error}"))?;
 
     Ok(())
 }
@@ -715,7 +738,6 @@ fn host_flake_parts_content(config: &InstallConfig) -> String {
 }
 
 fn host_module_content(config: &InstallConfig, users: &[UserConfig]) -> String {
-    let hostname = config.hostname.trim();
     let imports = host_imports(users);
     let import_lines = imports
         .iter()
@@ -743,35 +765,43 @@ fn host_module_content(config: &InstallConfig, users: &[UserConfig]) -> String {
         .join(" ");
 
     format!(
-        "{{ inputs, ... }}:\n{{\n  flake.modules.nixos.{} = {{ lib, pkgs, ... }}: {{\n    imports = with inputs.self.modules.nixos; [\n{}\n    ] ++ [ \"${{inputs.self}}/nixos/{}/hardware-configuration.nix\" ];\n\n    networking.hostName = {};\n    time.timeZone = {};\n    i18n.defaultLocale = {};\n    i18n.extraLocaleSettings = {{\n      LC_ADDRESS = {};\n      LC_IDENTIFICATION = {};\n      LC_MEASUREMENT = {};\n      LC_MONETARY = {};\n      LC_NAME = {};\n      LC_NUMERIC = {};\n      LC_PAPER = {};\n      LC_TELEPHONE = {};\n      LC_TIME = {};\n    }};\n    console.keyMap = {};\n\n    my.hardware.gpu = lib.mkDefault {};\n    my.hardware.cpu = lib.mkDefault {};\n    my.hardware.storage.enable = {};\n    my.installDisk = {{\n      boot = {};\n      root = {};\n      swap = {};\n    }};\n\n{}    services.openssh.enable = {};\n{}{}{}  }};\n}}\n",
-        nix_attr(hostname),
+        "{{ inputs, lib, pkgs, ... }}:\n{{\n  imports = with inputs.self.modules.nixos; [\n{}\n  ] ++ [ ./hardware-configuration.nix ];\n\n  networking.hostName = {};\n\n  my.hardware.gpu = lib.mkDefault {};\n  my.hardware.cpu = lib.mkDefault {};\n  my.hardware.storage.enable = {};\n  my.installDisk = {{\n    boot = {};\n    root = {};\n    swap = {};\n  }};\n\n  console.keyMap = {};\n\n{}{}{}\n}}\n",
         import_lines,
-        hostname,
-        nix_string(hostname),
-        nix_string(config.timezone.trim()),
-        nix_string(config.locale.trim()),
-        nix_string(config.locale.trim()),
-        nix_string(config.locale.trim()),
-        nix_string(config.locale.trim()),
-        nix_string(config.locale.trim()),
-        nix_string(config.locale.trim()),
-        nix_string(config.locale.trim()),
-        nix_string(config.locale.trim()),
-        nix_string(config.locale.trim()),
-        nix_string(config.locale.trim()),
-        nix_string(config.keyboard.trim()),
+        nix_string(config.hostname.trim()),
         nix_string(gpu_value(config)),
         nix_string(cpu_value(config)),
         nix_bool(config.storage_enabled),
         nix_string(boot_partition_device(config)),
         nix_string("/dev/disk/by-label/nixos"),
         nix_string(swap_partition_device(config)),
-        boot_loader_content(config),
-        nix_bool(config.ssh_enabled),
+        nix_string(config.keyboard.trim()),
         password_lines,
         custom_desktop_content(&custom_gui_users),
         custom_user_lines,
     )
+}
+
+fn hardware_configuration_content(config: &InstallConfig) -> String {
+    format!(
+        "{{ config, lib, ... }}:\nlet\n  installArgsPath = ./install-args.nix;\n  generatedHardwarePath = ./generated-hardware-configuration.nix;\n  installArgs =\n    if builtins.pathExists installArgsPath\n    then import installArgsPath\n    else {{ }};\n  installDisk = installArgs.installDisk or config.my.installDisk;\nin\n{{\n  imports = lib.optionals (builtins.pathExists generatedHardwarePath) [\n    generatedHardwarePath\n  ];\n\n{}  fileSystems.\"/\" = lib.mkForce {{\n    device = installDisk.root;\n    fsType = \"ext4\";\n  }};\n\n{}  swapDevices = lib.mkForce (\n    lib.optional (installDisk.swap != null && installDisk.swap != \"\") {{\n      device = installDisk.swap;\n    }}\n  );\n\n  networking.useDHCP = lib.mkDefault true;\n\n{}\n}}\n",
+        available_kernel_modules_content(config),
+        boot_filesystem_content(config),
+        boot_loader_content(config),
+    )
+}
+
+fn available_kernel_modules_content(config: &InstallConfig) -> String {
+    match gpu_value(config) {
+        "virtio" => "  boot.initrd.availableKernelModules = [\n    \"ahci\"\n    \"sd_mod\"\n    \"sr_mod\"\n    \"virtio_blk\"\n    \"virtio_net\"\n    \"virtio_pci\"\n    \"virtio_scsi\"\n    \"virtio_gpu\"\n    \"xhci_pci\"\n    \"usb_storage\"\n  ];\n\n".to_string(),
+        _ => "  boot.initrd.availableKernelModules = [\n    \"xhci_pci\"\n    \"nvme\"\n    \"ahci\"\n    \"usbhid\"\n    \"usb_storage\"\n    \"sd_mod\"\n    \"rtsx_pci_sdmmc\"\n  ];\n\n".to_string(),
+    }
+}
+
+fn boot_filesystem_content(config: &InstallConfig) -> String {
+    match config.boot_type {
+        BootType::SystemdBoot => "  fileSystems.\"/boot\" = lib.mkForce {\n    device = installDisk.boot;\n    fsType = \"vfat\";\n  };\n\n".to_string(),
+        BootType::Grub => String::new(),
+    }
 }
 
 fn host_imports(users: &[UserConfig]) -> Vec<&'static str> {
@@ -890,11 +920,11 @@ fn home_window_manager(user: &UserConfig) -> &'static str {
 fn boot_loader_content(config: &InstallConfig) -> String {
     match config.boot_type {
         BootType::SystemdBoot => {
-            "    boot.loader.systemd-boot.enable = true;\n    boot.loader.efi.canTouchEfiVariables = true;\n"
+            "  boot.loader.systemd-boot.enable = true;\n  boot.loader.efi.canTouchEfiVariables = true;\n"
                 .to_string()
         }
         BootType::Grub => format!(
-            "    boot.loader.grub.enable = true;\n    boot.loader.grub.device = {};\n",
+            "  boot.loader.grub.enable = true;\n  boot.loader.grub.device = {};\n",
             nix_string(config.device.trim()),
         ),
     }
@@ -1225,7 +1255,6 @@ mod tests {
         config.hostname = "jadeos".to_string();
         config.gpu_type = crate::config::GpuType::Nvidia;
         config.storage_enabled = true;
-        config.ssh_enabled = true;
         let users = vec![
             user_config("jade-core", crate::config::UserType::Cui, true),
             user_config("alice", crate::config::UserType::Gui, false),
@@ -1233,16 +1262,33 @@ mod tests {
 
         let content = host_module_content(&config, &users);
 
-        assert!(content.contains("flake.modules.nixos.\"jadeos\""));
+        assert!(content.contains("imports = with inputs.self.modules.nixos; ["));
+        assert!(content.contains("  ] ++ [ ./hardware-configuration.nix ];"));
+        assert!(content.contains("networking.hostName = \"jadeos\";"));
         assert!(content.contains("      jade-core"));
         assert!(content.contains("users.users.\"jade-core\".hashedPassword"));
         assert!(content.contains("users.users.\"alice\" = {"));
         assert!(content.contains("my.desktop.hyprlandUsers = [ \"alice\" ];"));
         assert!(content.contains("my.hardware.gpu = lib.mkDefault \"nvidia\";"));
         assert!(content.contains("my.hardware.storage.enable = true;"));
-        assert!(content.contains("services.openssh.enable = true;"));
-        assert!(content.contains("boot.loader.systemd-boot.enable = true;"));
+        assert!(content.contains("console.keyMap = \"jp106\";"));
+        assert!(!content.contains("services.openssh.enable"));
+        assert!(!content.contains("time.timeZone"));
         assert!(!content.contains("cli-tools"));
+    }
+
+    #[test]
+    fn generated_hardware_configuration_wraps_generated_output() {
+        let mut config = install_config();
+        config.gpu_custom = "virtio".to_string();
+
+        let content = hardware_configuration_content(&config);
+
+        assert!(content.contains("generatedHardwarePath = ./generated-hardware-configuration.nix;"));
+        assert!(content.contains("installDisk = installArgs.installDisk or config.my.installDisk;"));
+        assert!(content.contains("\"virtio_gpu\""));
+        assert!(content.contains("fileSystems.\"/boot\" = lib.mkForce"));
+        assert!(content.contains("boot.loader.systemd-boot.enable = true;"));
     }
 
     #[test]
@@ -1334,7 +1380,7 @@ mod tests {
         assert!(
             calls
                 .iter()
-                .any(|call| { call == "parted -s /dev/vda mkpart nixos ext4 512MiB 100%" })
+                .any(|call| { call == "parted -s /dev/vda mkpart nixos ext4 2GiB 100%" })
         );
         assert!(!calls.iter().any(|call| call.contains("linux-swap")));
         assert!(!calls.iter().any(|call| call.starts_with("mkswap ")));
@@ -1358,7 +1404,7 @@ mod tests {
         assert!(
             calls
                 .iter()
-                .any(|call| { call == "parted -s /dev/vda -- mkpart nixos ext4 512MiB -2GiB" })
+                .any(|call| { call == "parted -s /dev/vda -- mkpart nixos ext4 2GiB -2GiB" })
         );
         assert!(
             calls

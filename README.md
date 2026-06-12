@@ -32,6 +32,8 @@ nixos_configuration/
 │
 ├── nixos/
 │   └── <hostname>/
+│       ├── configuration.nix        # installer 管理のホスト設定本体
+│       ├── flake-parts.nix          # nixosConfigurations への登録
 │       ├── hardware-configuration.nix   # profile ごとのハードウェア設定
 │       ├── generated-hardware-configuration.nix # setup.sh が検出したハードウェア設定（必要時）
 │       └── install-args.nix             # setup.sh が生成するインストール入力（必要時）
@@ -40,10 +42,7 @@ nixos_configuration/
     ├── hardware/
     │   └── hardware.nix         # GPU/CPU ハードウェア抽象化
     │
-    ├── hosts/                   # PC ごとのホスト設定
-    │   └── <hostname>/
-    │       ├── configuration.nix
-    │       └── flake-parts.nix
+    ├── nixos-configurations.nix # nixos/*/flake-parts.nix の収集
     │
     ├── lib/
     │   └── helpers.nix          # mkNixos ヘルパー関数
@@ -124,7 +123,7 @@ nixos_configuration/
 
 ## ハードウェア設定
 
-GPU と CPU の種類はホスト設定（`modules/hosts/<hostname>/configuration.nix`）で**宣言的**に指定します。  
+GPU と CPU の種類はホスト設定（`nixos/<hostname>/configuration.nix`）で**宣言的**に指定します。  
 環境変数や `--impure` フラグは不要です。
 
 ```nix
@@ -182,7 +181,7 @@ sudo bash setup.sh
 ```bash
 REPO_URL="https://github.com/<user>/nixos_configuration.git" \
 TARGET_DISK="/dev/vda" \
-BOOT_SIZE="512MiB" \
+BOOT_SIZE="2GiB" \
 SWAP_SIZE="0" \
 sudo -E bash setup.sh
 ```
@@ -191,7 +190,7 @@ sudo -E bash setup.sh
 
 このスクリプトが行うこと:
 1. ネットワーク疎通を確認
-2. `modules/hosts` から flake profile を選択
+2. `nixos/` から flake profile を選択
 3. `lsblk` からインストール先ディスクを選択
 4. GPT パーティション作成・フォーマット・マウント
 5. リポジトリを `/mnt/etc/nixos` に配置
@@ -248,15 +247,15 @@ ssh -p 2222 nixos@127.0.0.1
 
 | デバイス | ラベル | サイズ | 用途 |
 |---|---|---|---|
-| `/dev/vda1` | `boot` | 512MiB | EFI システムパーティション |
+| `/dev/vda1` | `boot` | 2GiB | EFI システムパーティション |
 | `/dev/vda2` | `nixos` | 約17.5GiB | NixOS ルート (ext4) |
 | `/dev/vda3` | `swap` | 約2GiB | スワップ |
 
 ```bash
 parted -s /dev/vda mklabel gpt
-parted -s /dev/vda mkpart ESP fat32 1MiB 512MiB
+parted -s /dev/vda mkpart ESP fat32 1MiB 2GiB
 parted -s /dev/vda set 1 esp on
-parted -s /dev/vda mkpart nixos ext4 512MiB 18GiB
+parted -s /dev/vda mkpart nixos ext4 2GiB 18GiB
 parted -s /dev/vda mkpart swap linux-swap 18GiB 100%
 mkfs.fat -F 32 -n boot /dev/vda1
 mkfs.ext4 -L nixos -F /dev/vda2
@@ -452,7 +451,7 @@ passwd jade-full
 |---|---|
 | GPU/CPU ドライバー設定 | `modules/hardware/hardware.nix` |
 | nix-auto-storage 設定 | `modules/hardware/hardware.nix` |
-| ホスト固有設定（GPU 種別等） | `modules/hosts/<hostname>/configuration.nix` |
+| ホスト固有設定（GPU 種別等） | `nixos/<hostname>/configuration.nix` |
 | 共通基盤（Nix・GC・ブート・locale・入力・音声） | `modules/software/base.nix` |
 | Hyprland・greetd・Ironbar | `modules/software/hyprland/` |
 | KDE Plasma | `modules/software/plasma/plasma.nix` |
@@ -538,7 +537,8 @@ nix develop
 
 各 feature を自己完結させ、ホスト側は「どの feature を有効化するか」のみを記述します。  
 `import-tree` が `modules/` 配下の全 `.nix` ファイルを自動インポートし、  
-`flake-parts` の `flake.modules.nixos.*` / `flake.modules.homeManager.*` オプションを通じてモジュールが登録されます。
+`flake-parts` の `flake.modules.nixos.*` / `flake.modules.homeManager.*` オプションを通じてモジュールが登録されます。  
+ホストの `nixosConfigurations` 登録は `modules/nixos-configurations.nix` が `nixos/*/flake-parts.nix` を集めて行います。
 
 ```
 flake.nix

@@ -1,7 +1,0 @@
-# このディレクトリは setup.sh によって PC ごとのホスト設定が生成される場所です。
-# 各ホストは modules/hosts/<hostname>/ 以下に以下のファイルを持ちます:
-#   - configuration.nix   : ホスト固有の NixOS 設定 (import するモジュール・ハードウェア設定)
-#   - flake-parts.nix     : nixosConfigurations への登録
-#
-# 生成は setup.sh の generate_host_config / generate_host_flake_parts 関数が担います。
-# 手動でホストを追加する場合も同じ構造に従ってください。

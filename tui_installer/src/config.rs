@@ -127,7 +127,7 @@ impl Default for InstallConfig {
             repository_url: DEFAULT_REPOSITORY_URL.to_string(),
             repository_path: DEFAULT_REPOSITORY_PATH.to_string(),
             device: String::new(),
-            boot_size: "512MiB".to_string(),
+            boot_size: "2GiB".to_string(),
             swap_size: "0".to_string(),
             hostname: "nixos".to_string(),
             keyboard: "jp106".to_string(),
