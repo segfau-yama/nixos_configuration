@@ -683,13 +683,8 @@ fn generate_hardware_configuration<R: CommandRunner>(
             output.stderr.trim()
         ));
     }
-    fs::write(
-        host_dir.join("generated-hardware-configuration.nix"),
-        output.stdout,
-    )
-    .map_err(|error| format!("hardware: failed to write generated hardware config: {error}"))?;
-    emit_log(logs, "hardware: wrote generated-hardware-configuration.nix");
-    generate_host_module(config, users, Path::new("/mnt/etc/nixos"))?;
+    generate_host_module(config, users, Path::new("/mnt/etc/nixos"), &output.stdout)?;
+    emit_log(logs, "hardware: embedded nixos-generate-config output into hardware-configuration.nix");
     emit_log(logs, format!("host: generated configuration for {hostname}"));
     emit_log(
         logs,
@@ -702,6 +697,7 @@ fn generate_host_module(
     config: &InstallConfig,
     users: &[UserConfig],
     repository_root: &Path,
+    generated_hardware_output: &str,
 ) -> Result<(), String> {
     let hostname = config.hostname.trim();
     let host_module_dir = repository_root.join("nixos").join(hostname);
@@ -722,7 +718,7 @@ fn generate_host_module(
 
     fs::write(
         host_module_dir.join("hardware-configuration.nix"),
-        hardware_configuration_content(config),
+        hardware_configuration_content(config, generated_hardware_output),
     )
     .map_err(|error| format!("host: failed to write hardware-configuration.nix: {error}"))?;
 
@@ -781,20 +777,14 @@ fn host_module_content(config: &InstallConfig, users: &[UserConfig]) -> String {
     )
 }
 
-fn hardware_configuration_content(config: &InstallConfig) -> String {
+fn hardware_configuration_content(config: &InstallConfig, generated_hardware_output: &str) -> String {
+    let generated_hardware_module = indent_block(generated_hardware_output.trim_end(), 4);
     format!(
-        "{{ config, lib, ... }}:\nlet\n  installArgsPath = ./install-args.nix;\n  generatedHardwarePath = ./generated-hardware-configuration.nix;\n  installArgs =\n    if builtins.pathExists installArgsPath\n    then import installArgsPath\n    else {{ }};\n  installDisk = installArgs.installDisk or config.my.installDisk;\nin\n{{\n  imports = lib.optionals (builtins.pathExists generatedHardwarePath) [\n    generatedHardwarePath\n  ];\n\n{}  fileSystems.\"/\" = lib.mkForce {{\n    device = installDisk.root;\n    fsType = \"ext4\";\n  }};\n\n{}  swapDevices = lib.mkForce (\n    lib.optional (installDisk.swap != null && installDisk.swap != \"\") {{\n      device = installDisk.swap;\n    }}\n  );\n\n  networking.useDHCP = lib.mkDefault true;\n\n{}\n}}\n",
-        available_kernel_modules_content(config),
+        "{{ config, lib, ... }}:\nlet\n  installArgsPath = ./install-args.nix;\n  installArgs =\n    if builtins.pathExists installArgsPath\n    then import installArgsPath\n    else {{ }};\n  installDisk = installArgs.installDisk or config.my.installDisk;\n  # Captured from nixos-generate-config --show-hardware-config during install.\n  generatedHardwareModule =\n{}\nin\n{{\n  imports = [\n    generatedHardwareModule\n  ];\n\n  fileSystems.\"/\" = lib.mkForce {{\n    device = installDisk.root;\n    fsType = \"ext4\";\n  }};\n\n{}  swapDevices = lib.mkForce (\n    lib.optional (installDisk.swap != null && installDisk.swap != \"\") {{\n      device = installDisk.swap;\n    }}\n  );\n\n  networking.useDHCP = lib.mkDefault true;\n\n{}\n}}\n",
+        generated_hardware_module,
         boot_filesystem_content(config),
         boot_loader_content(config),
     )
-}
-
-fn available_kernel_modules_content(config: &InstallConfig) -> String {
-    match gpu_value(config) {
-        "virtio" => "  boot.initrd.availableKernelModules = [\n    \"ahci\"\n    \"sd_mod\"\n    \"sr_mod\"\n    \"virtio_blk\"\n    \"virtio_net\"\n    \"virtio_pci\"\n    \"virtio_scsi\"\n    \"virtio_gpu\"\n    \"xhci_pci\"\n    \"usb_storage\"\n  ];\n\n".to_string(),
-        _ => "  boot.initrd.availableKernelModules = [\n    \"xhci_pci\"\n    \"nvme\"\n    \"ahci\"\n    \"usbhid\"\n    \"usb_storage\"\n    \"sd_mod\"\n    \"rtsx_pci_sdmmc\"\n  ];\n\n".to_string(),
-    }
 }
 
 fn boot_filesystem_content(config: &InstallConfig) -> String {
@@ -967,6 +957,21 @@ fn nix_bool(value: bool) -> &'static str {
 
 fn nix_attr(value: &str) -> String {
     nix_string(value)
+}
+
+fn indent_block(content: &str, spaces: usize) -> String {
+    let padding = " ".repeat(spaces);
+    content
+        .lines()
+        .map(|line| {
+            if line.is_empty() {
+                String::new()
+            } else {
+                format!("{padding}{line}")
+            }
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
 }
 
 fn nix_string(value: &str) -> String {
@@ -1281,14 +1286,26 @@ mod tests {
     fn generated_hardware_configuration_wraps_generated_output() {
         let mut config = install_config();
         config.gpu_custom = "virtio".to_string();
+        let generated_output = r#"{ lib, modulesPath, ... }:
+{
+  imports = [ (modulesPath + "/installer/scan/not-detected.nix") ];
+  boot.initrd.availableKernelModules = [ "virtio_gpu" ];
+  fileSystems."/" = {
+    device = "/dev/disk/by-label/nixos";
+    fsType = "ext4";
+  };
+}
+"#;
 
-        let content = hardware_configuration_content(&config);
+        let content = hardware_configuration_content(&config, generated_output);
 
-        assert!(content.contains("generatedHardwarePath = ./generated-hardware-configuration.nix;"));
+        assert!(content.contains("generatedHardwareModule ="));
         assert!(content.contains("installDisk = installArgs.installDisk or config.my.installDisk;"));
+        assert!(content.contains("imports = [\n    generatedHardwareModule\n  ];"));
         assert!(content.contains("\"virtio_gpu\""));
         assert!(content.contains("fileSystems.\"/boot\" = lib.mkForce"));
         assert!(content.contains("boot.loader.systemd-boot.enable = true;"));
+        assert!(!content.contains("generatedHardwarePath"));
     }
 
     #[test]

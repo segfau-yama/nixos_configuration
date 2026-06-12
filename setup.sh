@@ -414,16 +414,56 @@ EOF
   fi
 }
 
-generate_hardware_config() {
+write_hardware_config() {
   local path="$1"
+  local generated_output="${2:-}"
 
   if is_true "$DRY_RUN"; then
-    info "Would generate hardware config: $path (dry-run: no file is created)"
-    printf '[DRY-RUN] nixos-generate-config --root %q --show-hardware-config > %q\n' "$MOUNT_ROOT" "$path"
+    info "Would generate and embed hardware config into: $path (dry-run: no file is created)"
+    printf '[DRY-RUN] nixos-generate-config --root %q --show-hardware-config\n' "$MOUNT_ROOT"
     return
   fi
 
-  nixos-generate-config --root "$MOUNT_ROOT" --show-hardware-config > "$path"
+  cat > "$path" <<EOF
+{ config, lib, ... }:
+let
+  installArgsPath = ./install-args.nix;
+  installArgs =
+    if builtins.pathExists installArgsPath
+    then import installArgsPath
+    else { };
+  installDisk = installArgs.installDisk or config.my.installDisk;
+  # Captured from nixos-generate-config --show-hardware-config during install.
+  generatedHardwareModule =
+$(printf '%s\n' "$generated_output" | sed 's/^/    /')
+in
+{
+  imports = [
+    generatedHardwareModule
+  ];
+
+  fileSystems."/" = lib.mkForce {
+    device = installDisk.root;
+    fsType = "ext4";
+  };
+
+  fileSystems."/boot" = lib.mkForce {
+    device = installDisk.boot;
+    fsType = "vfat";
+  };
+
+  swapDevices = lib.mkForce (
+    lib.optional (installDisk.swap != null && installDisk.swap != "") {
+      device = installDisk.swap;
+    }
+  );
+
+  networking.useDHCP = lib.mkDefault true;
+
+  boot.loader.systemd-boot.enable = true;
+  boot.loader.efi.canTouchEfiVariables = true;
+}
+EOF
 }
 
 check_prerequisites() {
@@ -446,6 +486,7 @@ check_prerequisites() {
   need_cmd find
   need_cmd sort
   need_cmd awk
+  need_cmd sed
   need_cmd git
 
   if ! is_true "$DRY_RUN"; then
@@ -479,7 +520,8 @@ main() {
   local target_repo="$MOUNT_ROOT/etc/nixos"
   local profile_dir="$target_repo/nixos/$PROFILE"
   local install_args="$profile_dir/install-args.nix"
-  local generated_hardware="$profile_dir/generated-hardware-configuration.nix"
+  local hardware_config="$profile_dir/hardware-configuration.nix"
+  local generated_hardware_output=""
 
   partition_disk
   format_and_mount
@@ -487,10 +529,12 @@ main() {
 
   run mkdir -p "$profile_dir"
   write_install_args "$install_args" "$PART_BOOT" "$PART_ROOT" "$PART_SWAP"
-  generate_hardware_config "$generated_hardware"
+  if ! is_true "$DRY_RUN"; then
+    generated_hardware_output="$(nixos-generate-config --root "$MOUNT_ROOT" --show-hardware-config)"
+  fi
+  write_hardware_config "$hardware_config" "$generated_hardware_output"
   run git -C "$target_repo" add -f \
-    "nixos/$PROFILE/install-args.nix" \
-    "nixos/$PROFILE/generated-hardware-configuration.nix"
+    "nixos/$PROFILE/install-args.nix"
 
   info "Installing NixOS from $target_repo#$PROFILE"
   run nixos-install --flake "$target_repo#$PROFILE"

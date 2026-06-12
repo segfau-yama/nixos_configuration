@@ -1,26 +1,48 @@
 { config, lib, ... }:
 let
   installArgsPath = ./install-args.nix;
-  generatedHardwarePath = ./generated-hardware-configuration.nix;
   installArgs =
     if builtins.pathExists installArgsPath
     then import installArgsPath
     else { };
   installDisk = installArgs.installDisk or config.my.installDisk;
+  # Captured from nixos-generate-config --show-hardware-config during install.
+  generatedHardwareModule =
+    { lib, modulesPath, ... }:
+    {
+      imports = [ (modulesPath + "/installer/scan/not-detected.nix") ];
+
+      boot.initrd.availableKernelModules = [
+        "xhci_pci"
+        "nvme"
+        "ahci"
+        "usbhid"
+        "usb_storage"
+        "sd_mod"
+        "rtsx_pci_sdmmc"
+      ];
+      boot.initrd.kernelModules = [ ];
+
+      fileSystems."/" = {
+        device = "/dev/disk/by-label/nixos";
+        fsType = "ext4";
+      };
+
+      fileSystems."/boot" = {
+        device = "/dev/disk/by-label/boot";
+        fsType = "vfat";
+      };
+
+      swapDevices = [
+        { device = "/dev/disk/by-label/swap"; }
+      ];
+
+      nixpkgs.hostPlatform = lib.mkDefault "x86_64-linux";
+    };
 in
 {
-  imports = lib.optionals (builtins.pathExists generatedHardwarePath) [
-    generatedHardwarePath
-  ];
-
-  boot.initrd.availableKernelModules = [
-    "xhci_pci"
-    "nvme"
-    "ahci"
-    "usbhid"
-    "usb_storage"
-    "sd_mod"
-    "rtsx_pci_sdmmc"
+  imports = [
+    generatedHardwareModule
   ];
 
   fileSystems."/" = lib.mkForce {

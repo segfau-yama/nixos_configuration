@@ -34,8 +34,7 @@ nixos_configuration/
 │   └── <hostname>/
 │       ├── configuration.nix        # installer 管理のホスト設定本体
 │       ├── flake-parts.nix          # nixosConfigurations への登録
-│       ├── hardware-configuration.nix   # profile ごとのハードウェア設定
-│       ├── generated-hardware-configuration.nix # setup.sh が検出したハードウェア設定（必要時）
+│       ├── hardware-configuration.nix   # installer 管理のハードウェア設定
 │       └── install-args.nix             # setup.sh が生成するインストール入力（必要時）
 │
 └── modules/
@@ -195,7 +194,7 @@ sudo -E bash setup.sh
 4. GPT パーティション作成・フォーマット・マウント
 5. リポジトリを `/mnt/etc/nixos` に配置
 6. `nixos/<profile>/install-args.nix` に boot/root/swap の割り当てを書き出し、flake 評価に含める
-7. `nixos-generate-config --show-hardware-config` の結果を `nixos/<profile>/generated-hardware-configuration.nix` に書き出す
+7. `nixos-generate-config --show-hardware-config` の結果を `nixos/<profile>/hardware-configuration.nix` へ埋め込む
 8. `nixos-install --flake /mnt/etc/nixos#<profile>` を実行
 
 ## 仮想マシンへのインストール
