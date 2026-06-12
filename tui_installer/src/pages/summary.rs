@@ -111,12 +111,6 @@ impl Component for SummaryPage {
                     FormFieldRole::ReadOnly,
                 ),
                 form_field(
-                    "storage",
-                    self.config.storage_enabled.to_string(),
-                    None,
-                    FormFieldRole::Toggle,
-                ),
-                form_field(
                     "gpu",
                     gpu_display(&self.config),
                     None,

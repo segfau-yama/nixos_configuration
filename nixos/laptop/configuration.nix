@@ -11,7 +11,6 @@
 
   my.hardware.gpu = lib.mkDefault "amd";
   my.hardware.cpu = lib.mkDefault "amd";
-  my.hardware.storage.enable = false;
   my.installDisk = {
     boot = "/dev/disk/by-label/boot";
     root = "/dev/disk/by-label/nixos";

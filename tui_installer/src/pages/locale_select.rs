@@ -37,12 +37,6 @@ pub struct SshPage {
     status_message: Option<String>,
 }
 
-#[derive(Default)]
-pub struct StoragePage {
-    enabled: bool,
-    status_message: Option<String>,
-}
-
 pub fn keyboard_page() -> Box<dyn InstallerPage> {
     Box::new(KeyboardPage::default())
 }
@@ -57,10 +51,6 @@ pub fn timezone_page() -> Box<dyn InstallerPage> {
 
 pub fn ssh_page() -> Box<dyn InstallerPage> {
     Box::new(SshPage::default())
-}
-
-pub fn storage_page() -> Box<dyn InstallerPage> {
-    Box::new(StoragePage::default())
 }
 
 impl InstallerPage for KeyboardPage {
@@ -196,7 +186,7 @@ impl Component for SshPage {
         match key.code {
             KeyCode::Char('q') => Action::Quit,
             KeyCode::Left => Action::Navigate(Screen::TimezoneSelect),
-            KeyCode::Right => Action::Navigate(Screen::StorageToggle),
+            KeyCode::Right => Action::Navigate(Screen::UserMenu),
             KeyCode::Enter | KeyCode::Char(' ') => {
                 self.enabled = !self.enabled;
                 Action::ConfigChanged(ConfigChange::SshEnabled(self.enabled))
@@ -213,44 +203,6 @@ impl Component for SshPage {
             "enabled",
             self.enabled,
             "Space or Enter toggles OpenSSH access",
-            self.status_message.as_deref(),
-        );
-    }
-}
-
-impl InstallerPage for StoragePage {
-    fn screen(&self) -> Screen {
-        Screen::StorageToggle
-    }
-
-    fn sync(&mut self, snapshot: &AppSnapshot) {
-        self.enabled = snapshot.config.storage_enabled;
-        self.status_message = snapshot.status_message.clone();
-    }
-}
-
-impl Component for StoragePage {
-    fn handle_key_events(&mut self, key: KeyEvent) -> Action {
-        match key.code {
-            KeyCode::Char('q') => Action::Quit,
-            KeyCode::Left => Action::Navigate(Screen::SshToggle),
-            KeyCode::Right => Action::Navigate(Screen::UserMenu),
-            KeyCode::Enter | KeyCode::Char(' ') => {
-                self.enabled = !self.enabled;
-                Action::ConfigChanged(ConfigChange::StorageEnabled(self.enabled))
-            }
-            _ => Action::Noop,
-        }
-    }
-
-    fn render(&mut self, f: &mut Frame, rect: Rect) {
-        render_toggle_page(
-            f,
-            rect,
-            "storage",
-            "enabled",
-            self.enabled,
-            "Space or Enter toggles the optional storage module",
             self.status_message.as_deref(),
         );
     }

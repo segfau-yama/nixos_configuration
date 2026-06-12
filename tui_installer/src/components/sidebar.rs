@@ -63,7 +63,6 @@ fn sidebar_text(snapshot: &AppSnapshot) -> Text<'static> {
         summary_line("gpu", &gpu_display(&snapshot.config)),
         summary_line("cpu", &cpu_display(&snapshot.config)),
         summary_line("ssh", &snapshot.config.ssh_enabled.to_string()),
-        summary_line("storage", &snapshot.config.storage_enabled.to_string()),
         summary_line("users", &users_display(&snapshot.config)),
         summary_line("gui user", &snapshot.config.has_gui_user().to_string()),
         summary_line(

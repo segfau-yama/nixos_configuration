@@ -131,7 +131,7 @@ impl Component for UserMenuPage {
                 self.selected = (self.selected + 1).min(USER_MENU_OPTIONS.len() - 1);
                 Action::Noop
             }
-            KeyCode::Left => Action::Navigate(Screen::StorageToggle),
+            KeyCode::Left => Action::Navigate(Screen::SshToggle),
             KeyCode::Right | KeyCode::Enter => match self.selected {
                 0 => Action::StartPresetUser(PendingUser::preset(
                     "jade-core",

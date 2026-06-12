@@ -1,5 +1,5 @@
 [hardware]
-# hardware=cpu+gpu+storage
+# hardware=cpu+gpu
 
 [hardware.cpu]
 # hardware.cpu.amd.updateMicrocode = true
@@ -16,10 +16,6 @@ nvidia="nvtopPackages.nvidia, vulkan-tools, vulkan-loader, vulkan-validation-lay
 amd="mesa"
 # hardware.graphics.enable=true, hardware video decoding via intel-media-driver
 intel="intel-media-driver, intel-compute-runtime, intel-gpu-tools"
-
-[hardware.storage]
-# systemd.services.nix-auto-storage auto-mounts non-boot drives and places /nix on them; btrfs-progs applied automatically
-storage=1
 
 [software]
 # software=base+users
@@ -91,33 +87,30 @@ mechanical="freecad-wayland, meshlab"
 # other user settings...
 
 [pc1]
-# pc1 is a desktop with AMD CPU, AMD GPU, 1 storage, and has jade-core and jade-full preset users.
+# pc1 is a desktop with AMD CPU, AMD GPU, and has jade-core and jade-full preset users.
 [pc1.hardware]
 cpu="amd"
 gpu="amd"
-storage=1
 
 [pc1.software]
 base="base"
 users=["jade-core", "jade-full"]
 
 [pc2]
-# pc2 is a desktop with AMD CPU, NVIDIA GPU, 2 storage, and has jade-gaming and jade-develop preset users.
+# pc2 is a desktop with AMD CPU, NVIDIA GPU, and has jade-gaming and jade-develop preset users.
 [pc2.hardware]
 cpu="amd"
 gpu="nvidia"
-storage=2
 
 [pc2.software]
 base="base"
 users=["jade-gaming", "jade-develop"]
 
 [pc3]
-# pc3 is a virtual machine with Intel CPU, Intel GPU, 1 storage, and has only jade-core preset user.
+# pc3 is a virtual machine with Intel CPU, Intel GPU, and has only jade-core preset user.
 [pc3.hardware]
 cpu="intel"
 gpu="intel"
-storage=1
 
 [pc3.software]
 base="base"

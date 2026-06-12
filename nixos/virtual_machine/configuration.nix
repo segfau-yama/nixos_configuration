@@ -11,7 +11,6 @@
 
   my.hardware.gpu = lib.mkDefault "virtio";
   my.hardware.cpu = lib.mkDefault "amd";
-  my.hardware.storage.enable = false;
   my.installDisk = {
     boot = "/dev/vda1";
     root = "/dev/vda2";

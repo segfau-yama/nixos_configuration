@@ -63,7 +63,6 @@ pub enum Screen {
     LocaleSelect,
     TimezoneSelect,
     SshToggle,
-    StorageToggle,
     UserMenu,
     PresetUserPassword,
     CustomUserBasic,
@@ -93,7 +92,6 @@ impl Screen {
             Self::LocaleSelect => "Locale",
             Self::TimezoneSelect => "Timezone",
             Self::SshToggle => "SSH",
-            Self::StorageToggle => "Storage",
             Self::UserMenu => "Users",
             Self::PresetUserPassword => "Preset Password",
             Self::CustomUserBasic => "Custom User",
@@ -122,8 +120,7 @@ impl Screen {
             | Self::KeyboardSelect
             | Self::LocaleSelect
             | Self::TimezoneSelect
-            | Self::SshToggle
-            | Self::StorageToggle => Phase::PcConfig,
+            | Self::SshToggle => Phase::PcConfig,
             Self::UserMenu
             | Self::PresetUserPassword
             | Self::CustomUserBasic
@@ -402,7 +399,6 @@ impl App {
             ConfigChange::Locale(value) => self.config.locale = value,
             ConfigChange::Timezone(value) => self.config.timezone = value,
             ConfigChange::SshEnabled(value) => self.config.ssh_enabled = value,
-            ConfigChange::StorageEnabled(value) => self.config.storage_enabled = value,
             ConfigChange::GpuType(value) => self.config.gpu_type = value,
             ConfigChange::GpuCustom(value) => self.config.gpu_custom = value,
             ConfigChange::CpuType(value) => self.config.cpu_type = value,

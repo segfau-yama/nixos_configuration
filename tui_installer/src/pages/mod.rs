@@ -65,7 +65,6 @@ pub fn build_pages() -> HashMap<Screen, Box<dyn InstallerPage>> {
         locale_select::locale_page(),
         locale_select::timezone_page(),
         locale_select::ssh_page(),
-        locale_select::storage_page(),
         user_menu::menu_page(),
         user_menu::preset_password_page(),
         user_menu::custom_basic_page(),

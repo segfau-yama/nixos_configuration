@@ -673,7 +673,12 @@ fn generate_hardware_configuration<R: CommandRunner>(
         .run_with_log(
             "nixos-generate-config",
             &["--root", MOUNT_ROOT, "--show-hardware-config"],
-            &mut |line| emit_log(logs, format!("hardware: nixos-generate-config output: {line}")),
+            &mut |line| {
+                emit_log(
+                    logs,
+                    format!("hardware: nixos-generate-config output: {line}"),
+                )
+            },
         )
         .map_err(|error| format!("hardware: nixos-generate-config failed: {error}"))?;
     if output.exit_code != 0 {
@@ -684,8 +689,14 @@ fn generate_hardware_configuration<R: CommandRunner>(
         ));
     }
     generate_host_module(config, users, Path::new("/mnt/etc/nixos"), &output.stdout)?;
-    emit_log(logs, "hardware: embedded nixos-generate-config output into hardware-configuration.nix");
-    emit_log(logs, format!("host: generated configuration for {hostname}"));
+    emit_log(
+        logs,
+        "hardware: embedded nixos-generate-config output into hardware-configuration.nix",
+    );
+    emit_log(
+        logs,
+        format!("host: generated configuration for {hostname}"),
+    );
     emit_log(
         logs,
         format!("host: applied {} user definition(s)", users.len()),
@@ -761,12 +772,11 @@ fn host_module_content(config: &InstallConfig, users: &[UserConfig]) -> String {
         .join(" ");
 
     format!(
-        "{{ inputs, lib, pkgs, ... }}:\n{{\n  imports = with inputs.self.modules.nixos; [\n{}\n  ] ++ [ ./hardware-configuration.nix ];\n\n  networking.hostName = {};\n\n  my.hardware.gpu = lib.mkDefault {};\n  my.hardware.cpu = lib.mkDefault {};\n  my.hardware.storage.enable = {};\n  my.installDisk = {{\n    boot = {};\n    root = {};\n    swap = {};\n  }};\n\n  console.keyMap = {};\n\n{}{}{}\n}}\n",
+        "{{ inputs, lib, pkgs, ... }}:\n{{\n  imports = with inputs.self.modules.nixos; [\n{}\n  ] ++ [ ./hardware-configuration.nix ];\n\n  networking.hostName = {};\n\n  my.hardware.gpu = lib.mkDefault {};\n  my.hardware.cpu = lib.mkDefault {};\n  my.installDisk = {{\n    boot = {};\n    root = {};\n    swap = {};\n  }};\n\n  console.keyMap = {};\n\n{}{}{}\n}}\n",
         import_lines,
         nix_string(config.hostname.trim()),
         nix_string(gpu_value(config)),
         nix_string(cpu_value(config)),
-        nix_bool(config.storage_enabled),
         nix_string(boot_partition_device(config)),
         nix_string("/dev/disk/by-label/nixos"),
         nix_string(swap_partition_device(config)),
@@ -777,7 +787,10 @@ fn host_module_content(config: &InstallConfig, users: &[UserConfig]) -> String {
     )
 }
 
-fn hardware_configuration_content(config: &InstallConfig, generated_hardware_output: &str) -> String {
+fn hardware_configuration_content(
+    config: &InstallConfig,
+    generated_hardware_output: &str,
+) -> String {
     let generated_hardware_module = indent_block(generated_hardware_output.trim_end(), 4);
     format!(
         "{{ config, lib, ... }}:\nlet\n  installArgsPath = ./install-args.nix;\n  installArgs =\n    if builtins.pathExists installArgsPath\n    then import installArgsPath\n    else {{ }};\n  installDisk = installArgs.installDisk or config.my.installDisk;\n  # Captured from nixos-generate-config --show-hardware-config during install.\n  generatedHardwareModule =\n{}\nin\n{{\n  imports = [\n    generatedHardwareModule\n  ];\n\n  fileSystems.\"/\" = lib.mkForce {{\n    device = installDisk.root;\n    fsType = \"ext4\";\n  }};\n\n{}  swapDevices = lib.mkForce (\n    lib.optional (installDisk.swap != null && installDisk.swap != \"\") {{\n      device = installDisk.swap;\n    }}\n  );\n\n  networking.useDHCP = lib.mkDefault true;\n\n{}\n}}\n",
@@ -949,10 +962,6 @@ fn nixos_system(config: &InstallConfig) -> &'static str {
     } else {
         "x86_64-linux"
     }
-}
-
-fn nix_bool(value: bool) -> &'static str {
-    if value { "true" } else { "false" }
 }
 
 fn nix_attr(value: &str) -> String {
@@ -1259,7 +1268,6 @@ mod tests {
         let mut config = install_config();
         config.hostname = "jadeos".to_string();
         config.gpu_type = crate::config::GpuType::Nvidia;
-        config.storage_enabled = true;
         let users = vec![
             user_config("jade-core", crate::config::UserType::Cui, true),
             user_config("alice", crate::config::UserType::Gui, false),
@@ -1275,7 +1283,6 @@ mod tests {
         assert!(content.contains("users.users.\"alice\" = {"));
         assert!(content.contains("my.desktop.hyprlandUsers = [ \"alice\" ];"));
         assert!(content.contains("my.hardware.gpu = lib.mkDefault \"nvidia\";"));
-        assert!(content.contains("my.hardware.storage.enable = true;"));
         assert!(content.contains("console.keyMap = \"jp106\";"));
         assert!(!content.contains("services.openssh.enable"));
         assert!(!content.contains("time.timeZone"));
@@ -1300,7 +1307,9 @@ mod tests {
         let content = hardware_configuration_content(&config, generated_output);
 
         assert!(content.contains("generatedHardwareModule ="));
-        assert!(content.contains("installDisk = installArgs.installDisk or config.my.installDisk;"));
+        assert!(
+            content.contains("installDisk = installArgs.installDisk or config.my.installDisk;")
+        );
         assert!(content.contains("imports = [\n    generatedHardwareModule\n  ];"));
         assert!(content.contains("\"virtio_gpu\""));
         assert!(content.contains("fileSystems.\"/boot\" = lib.mkForce"));

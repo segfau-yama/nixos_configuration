@@ -16,7 +16,6 @@ pub enum ConfigChange {
     Locale(String),
     Timezone(String),
     SshEnabled(bool),
-    StorageEnabled(bool),
     GpuType(GpuType),
     GpuCustom(String),
     CpuType(CpuType),
