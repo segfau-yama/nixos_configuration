@@ -435,7 +435,7 @@ let
   installDisk = installArgs.installDisk or config.my.installDisk;
   # Captured from nixos-generate-config --show-hardware-config during install.
   generatedHardwareModule =
-$(printf '%s\n' "$generated_output" | sed 's/^/    /')
+$(printf '%s\n' "$generated_output" | sed 's/^/    /');
 in
 {
   imports = [

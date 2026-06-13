@@ -793,7 +793,7 @@ fn hardware_configuration_content(
 ) -> String {
     let generated_hardware_module = indent_block(generated_hardware_output.trim_end(), 4);
     format!(
-        "{{ config, lib, ... }}:\nlet\n  installArgsPath = ./install-args.nix;\n  installArgs =\n    if builtins.pathExists installArgsPath\n    then import installArgsPath\n    else {{ }};\n  installDisk = installArgs.installDisk or config.my.installDisk;\n  # Captured from nixos-generate-config --show-hardware-config during install.\n  generatedHardwareModule =\n{}\nin\n{{\n  imports = [\n    generatedHardwareModule\n  ];\n\n  fileSystems.\"/\" = lib.mkForce {{\n    device = installDisk.root;\n    fsType = \"ext4\";\n  }};\n\n{}  swapDevices = lib.mkForce (\n    lib.optional (installDisk.swap != null && installDisk.swap != \"\") {{\n      device = installDisk.swap;\n    }}\n  );\n\n  networking.useDHCP = lib.mkDefault true;\n\n{}\n}}\n",
+        "{{ config, lib, ... }}:\nlet\n  installArgsPath = ./install-args.nix;\n  installArgs =\n    if builtins.pathExists installArgsPath\n    then import installArgsPath\n    else {{ }};\n  installDisk = installArgs.installDisk or config.my.installDisk;\n  # Captured from nixos-generate-config --show-hardware-config during install.\n  generatedHardwareModule =\n{};\nin\n{{\n  imports = [\n    generatedHardwareModule\n  ];\n\n  fileSystems.\"/\" = lib.mkForce {{\n    device = installDisk.root;\n    fsType = \"ext4\";\n  }};\n\n{}  swapDevices = lib.mkForce (\n    lib.optional (installDisk.swap != null && installDisk.swap != \"\") {{\n      device = installDisk.swap;\n    }}\n  );\n\n  networking.useDHCP = lib.mkDefault true;\n\n{}\n}}\n",
         generated_hardware_module,
         boot_filesystem_content(config),
         boot_loader_content(config),
@@ -1307,6 +1307,7 @@ mod tests {
         let content = hardware_configuration_content(&config, generated_output);
 
         assert!(content.contains("generatedHardwareModule ="));
+        assert!(content.contains("  };\nin\n{"));
         assert!(
             content.contains("installDisk = installArgs.installDisk or config.my.installDisk;")
         );
